@@ -3,11 +3,11 @@ import { useState, useEffect } from "react"
 import { createClient } from "@supabase/supabase-js"
 import { BACKGROUNDS } from "@/lib/backgrounds"
 import { useToast } from "@/components/Toast"
-import { Paintbrush, Check, Star } from "lucide-react"
+import { Paintbrush, Check } from "lucide-react"
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
-export default function CustomizeProfile({ profile, onUpdate }: { profile: any, onUpdate: () => void }) {
+export default function CustomizeProfile({ profile }: { profile: any }) {
   const [inventory, setInventory] = useState<any[]>([])
   const [selectedShowcase, setSelectedShowcase] = useState<string[]>(profile.showcase_items || [])
   const [isLoading, setIsLoading] = useState(false)
@@ -28,7 +28,7 @@ export default function CustomizeProfile({ profile, onUpdate }: { profile: any, 
     })
     if (res.ok) {
       showToast("Arka plan satın alındı ve uygulandı!", "success")
-      onUpdate()
+      setTimeout(() => window.location.reload(), 1000) // Sayfayı yenile
     } else {
       const d = await res.json()
       showToast(d.error, "error")
@@ -53,7 +53,7 @@ export default function CustomizeProfile({ profile, onUpdate }: { profile: any, 
     })
     if (res.ok) {
       showToast("Vitrin başarıyla güncellendi!", "success")
-      onUpdate()
+      setTimeout(() => window.location.reload(), 1000) // Sayfayı yenile
     } else {
       showToast("Vitrin güncellenemedi.", "error")
     }

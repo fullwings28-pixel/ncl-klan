@@ -78,24 +78,10 @@ export default async function Dashboard() {
               </div>
             </div>
 
-            {/* VİTRİN GÖSTERİMİ */}
-            {profile.showcase_items && profile.showcase_items.length > 0 && (
-              <div className="mt-6 bg-black/60 p-4 rounded-lg border border-white/10">
-                <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Eşya Vitrini</h3>
-                <div className="flex gap-4 justify-center md:justify-start">
-                  {profile.showcase_items.map((itemId: string) => {
-                     // Not: Vitrin eşyalarının detaylarını çekmek için bir API çağrısı gerekebilir ancak hız için şimdilik sadece ID tutuyoruz.
-                     // İleride buraya eşya resimlerini çekeceğiz. (Bu kısım için veritabanı join'i kullanılabilir)
-                     return null; 
-                  })}
-                  {/* Geçici placeholder */}
-                  <div className="text-xs text-zinc-500 italic">Eşyalar yükleniyor... (Bu kısım bir sonraki adımda tamamlanacak)</div>
-                </div>
-              </div>
-            )}
-
+            {/* KİŞİSELLEŞTİRME BİLEŞENİ (onUpdate prop'u kaldırıldı) */}
+            <CustomizeProfile profile={profile} />
+            
             <SelectRole initialRole={profile.player_role} />
-            <CustomizeProfile profile={profile} onUpdate={() => window.location.reload()} />
             <EditAbout initialAbout={profile.about_me} />
           </div>
         </div>
