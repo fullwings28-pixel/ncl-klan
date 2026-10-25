@@ -1,6 +1,6 @@
 "use client"
 import Link from "next/link"
-import { Menu, Trophy, Activity } from "lucide-react"
+import { Menu, Activity } from "lucide-react"
 import { useEffect, useState } from "react"
 import NotificationBell from "./NotificationBell"
 import Sidebar from "./Sidebar"
@@ -20,10 +20,7 @@ export default function Navbar({ profile }: { profile: any }) {
         <div className="max-w-7xl mx-auto px-4 h-[72px] flex items-center justify-between">
           
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-2 -ml-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-all group"
-            >
+            <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-all group">
               <Menu size={24} className="group-hover:text-red-500 transition-colors" />
             </button>
             
@@ -52,9 +49,10 @@ export default function Navbar({ profile }: { profile: any }) {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-md">
-              <Trophy size={14} className="text-yellow-500" />
-              <span className="text-sm font-bold text-yellow-500">{profile?.xp || 0} XP</span>
+            {/* BAKİYE DOLAR OLARAK GÖSTERİLDİ */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-md">
+              <span className="text-green-500 font-bold text-sm">$</span>
+              <span className="text-sm font-bold text-green-500">{Number(profile?.balance || 0).toFixed(2)}</span>
             </div>
 
             <div className="w-px h-6 bg-white/10"></div>
@@ -77,12 +75,7 @@ export default function Navbar({ profile }: { profile: any }) {
       </nav>
 
       <GlobalNotifications currentUser={profile} />
-
-      <Sidebar 
-        isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)} 
-        profile={profile} 
-      />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} profile={profile} />
     </>
   )
 }

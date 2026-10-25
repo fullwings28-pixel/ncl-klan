@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
-import { Coins, Package, ArrowRight } from "lucide-react"
+import { Coins, Package, ArrowRight, DollarSign } from "lucide-react"
 import { useToast } from "@/components/Toast"
 import ConfirmModal from "@/components/ConfirmModal"
 
@@ -9,7 +9,6 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
   const [balance, setBalance] = useState(currentUser.balance || 0)
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
-
   const [confirmState, setConfirmState] = useState<{ isOpen: boolean, item: any }>({ isOpen: false, item: null })
 
   const fetchItems = async () => {
@@ -21,21 +20,19 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
 
   useEffect(() => { fetchItems() }, [])
 
-  const handleSellClick = (item: any) => {
-    setConfirmState({ isOpen: true, item })
-  }
+  const handleSellClick = (item: any) => setConfirmState({ isOpen: true, item })
 
   const confirmSell = async () => {
     if (!confirmState.item) return
     const { id, price, skin_name } = confirmState.item
 
     const res = await fetch("/api/inventory/sell", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inventoryId: id, price }) })
-    
     const data = await res.json()
+    
     if (res.ok) {
       setBalance(data.newBalance)
       setItems(prev => prev.filter(item => item.id !== id))
-      showToast(`"${skin_name}" başarıyla satıldı! +${price} Kredi`, "success")
+      showToast(`"${skin_name}" başarıyla satıldı! +$${price.toFixed(2)}`, "success")
     } else showToast(data.error || "Satış başarısız.", "error")
     
     setConfirmState({ isOpen: false, item: null })
@@ -59,7 +56,7 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
       <ConfirmModal 
         isOpen={confirmState.isOpen}
         title="Eşyayı Sat"
-        message={confirmState.item ? `"${confirmState.item.skin_name}" eşyasını ${confirmState.item.price} Kredi karşılığında satmak istediğine emin misin?` : ""}
+        message={confirmState.item ? `"${confirmState.item.skin_name}" eşyasını $${Number(confirmState.item.price).toFixed(2)} karşılığında satmak istediğine emin misin?` : ""}
         onConfirm={confirmSell}
         onCancel={() => setConfirmState({ isOpen: false, item: null })}
       />
@@ -71,11 +68,11 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
           </h1>
           <p className="text-zinc-400 text-xs mt-1 tracking-wider uppercase">Kasalardan çıkan eşyaların burada.</p>
         </div>
-        <div className="bg-black/50 border border-yellow-500/30 px-5 py-3 rounded-sm flex items-center gap-4 shadow-[0_0_15px_rgba(234,179,8,0.1)]">
-          <Coins className="text-yellow-500" size={24} />
+        <div className="bg-black/50 border border-green-500/30 px-5 py-3 rounded-sm flex items-center gap-4 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+          <DollarSign className="text-green-500" size={24} />
           <div>
             <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Bakiyen</div>
-            <div className="text-xl font-black text-white">{balance} <span className="text-xs text-yellow-500">KREDİ</span></div>
+            <div className="text-xl font-black text-white">${Number(balance).toFixed(2)}</div>
           </div>
         </div>
       </div>
@@ -92,14 +89,15 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-4 w-full">
           {items.map((item) => (
             <div key={item.id} className={`rounded-md border p-3 flex flex-col items-center relative group transition-all duration-300 hover:-translate-y-1 ${getRarityStyle(item.skin_rarity)}`}>
-              <div className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full bg-white/20 group-hover:bg-white/50 transition-colors"></div>
-              <img src={item.skin_image} alt={item.skin_name} className="w-full h-16 object-contain mb-3 drop-shadow-2xl group-hover:scale-110 transition-transform duration-300" />
-              <div className="text-center w-full mb-3">
-                <div className="text-[9px] text-zinc-500 uppercase tracking-widest mb-0.5">{item.skin_rarity}</div>
+              <img src={item.skin_image} alt={item.skin_name} className="w-full h-16 object-contain mb-2 drop-shadow-2xl group-hover:scale-110 transition-transform duration-300" />
+              <div className="text-center w-full mb-2">
+                <div className="text-[8px] text-zinc-500 uppercase tracking-widest mb-0.5">{item.skin_rarity}</div>
                 <div className="text-[11px] font-bold text-white truncate w-full tracking-wide" title={item.skin_name}>{item.skin_name}</div>
+                {item.wear && <div className="text-[9px] text-zinc-400 mt-0.5">{item.wear}</div>}
+                {item.float_value && <div className="text-[8px] text-zinc-600 font-mono">F: {Number(item.float_value).toFixed(5)}</div>}
               </div>
-              <button onClick={() => handleSellClick(item)} className="w-full bg-black/40 hover:bg-red-600/20 text-zinc-400 hover:text-red-400 py-1.5 rounded-sm text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 border border-white/5 hover:border-red-500/30 uppercase tracking-widest">
-                <Coins size={12} /> {item.price} Sat
+              <button onClick={() => handleSellClick(item)} className="w-full bg-black/40 hover:bg-green-600/20 text-zinc-400 hover:text-green-400 py-1.5 rounded-sm text-[10px] font-bold transition-all flex items-center justify-center gap-1 border border-white/5 hover:border-green-500/30 uppercase tracking-widest">
+                <Coins size={12} /> ${Number(item.price).toFixed(2)} SAT
               </button>
             </div>
           ))}
