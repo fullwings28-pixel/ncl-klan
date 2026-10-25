@@ -13,7 +13,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   const [quantity, setQuantity] = useState(1)
   const [isOpening, setIsOpening] = useState(false)
   
-  // KAZANILANLARI ANİMASYON BİTENE KADAR TUTACAĞIMIZ STATE
   const [wonSkins, setWonSkins] = useState<any[] | null>(null)
   const [isClaiming, setIsClaiming] = useState(false)
   const [reel, setReel] = useState<Skin[]>([])
@@ -93,13 +92,12 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     try {
       const res = await fetch("/api/case/open", { 
         method: "POST", headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ crateId: selectedCrate.id, quantity: Number(quantity) }) // Sayı olarak zorluyoruz
+        body: JSON.stringify({ crateId: selectedCrate.id, quantity: Number(quantity) })
       })
       const data = await res.json()
 
       if (!res.ok) { showAlert(data.error || "Kasa açılamadı.", "error"); setIsOpening(false); return }
       
-      // Veriyi hafızaya al
       resultRef.current = data.skins;
 
       const pool = selectedCrate.contains || []
@@ -107,12 +105,21 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       
       const winningIndex = 55
       
-      // EĞER 5'Lİ AÇILDIYSA, 5 SKİNİ DE ŞERİDİN FARKLI YERLERİNE KOY (Görsel şölen)
-      if (data.skins.length > 0) newReel[winningIndex] = data.skins[0];
-      if (data.skins.length > 1) newReel[winningIndex - 5] = data.skins[1];
-      if (data.skins.length > 2) newReel[winningIndex - 10] = data.skins[2];
-      if (data.skins.length > 3) newReel[winningIndex - 15] = data.skins[3];
-      if (data.skins.length > 4) newReel[winningIndex - 20] = data.skins[4];
+      // ÇOKLU AÇMA GÖRSEL DÜZELTMESİ:
+      // Eğer 5'li açıldıysa, 5 skini de ibrenin tam ortasına yan yana diz.
+      if (quantity === 5 && data.skins.length === 5) {
+        newReel[53] = data.skins[0];
+        newReel[54] = data.skins[1];
+        newReel[55] = data.skins[2];
+        newReel[56] = data.skins[3];
+        newReel[57] = data.skins[4];
+      } else if (quantity === 3 && data.skins.length === 3) {
+        newReel[54] = data.skins[0];
+        newReel[55] = data.skins[1];
+        newReel[56] = data.skins[2];
+      } else if (data.skins.length > 0) {
+        newReel[55] = data.skins[0];
+      }
 
       setReel(newReel); 
       setBalance(data.newBalance)
@@ -123,6 +130,8 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
           const containerCenter = containerWidth / 2;
           const ITEM_WIDTH = 120; const GAP = 12; 
           const totalItemWidth = ITEM_WIDTH + GAP;
+          
+          // İbreyi 55. elemana (tam ortaya) odakla
           const itemCenterX = (winningIndex * totalItemWidth) + (ITEM_WIDTH / 2);
           const randomOffset = (Math.random() - 0.5) * (ITEM_WIDTH - 40); 
           setAnimationTarget(`${containerCenter - itemCenterX + randomOffset}px`)
@@ -142,7 +151,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       setIsOpening(false)
       if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
       
-      // Animasyon bitince sonuçları göster
       if (resultRef.current) {
         setWonSkins(resultRef.current);
       }
