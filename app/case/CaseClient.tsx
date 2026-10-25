@@ -15,18 +15,20 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   
   const [wonSkins, setWonSkins] = useState<any[] | null>(null)
   const [isClaiming, setIsClaiming] = useState(false)
-  const [reel, setReel] = useState<Skin[]>([])
-  const [loading, setLoading] = useState(true)
   
-  const [animationTarget, setAnimationTarget] = useState<string | number>(0)
+  // Multi-reel state
+  const [reels, setReels] = useState<{ id: number, items: Skin[], target: string, duration: number }[]>([])
   const [reelKey, setReelKey] = useState(0)
+  const [completedReels, setCompletedReels] = useState(0)
   
-  const containerRef = useRef<HTMLDivElement>(null)
   const resultRef = useRef<any[] | null>(null) 
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([])
   
   const tickAudioRef = useRef<HTMLAudioElement | null>(null)
   const tickTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false)
+
+  const [loading, setLoading] = useState(true)
 
   const [alertState, setAlertState] = useState({ isOpen: false, message: "", type: "info" as "info" | "error" | "success" })
   const showAlert = (message: string, type: "info" | "error" | "success" = "info") => setAlertState({ isOpen: true, message, type })
@@ -86,8 +88,13 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     
     setIsOpening(true); 
     setWonSkins(null); 
-    setAnimationTarget(0)
-    playTickSequence(4500);
+    setCompletedReels(0);
+    setReels([]);
+    
+    const durations = [3.5, 4.0, 4.5, 5.0, 5.5];
+    const maxDuration = durations[quantity - 1] || 5.5;
+    
+    playTickSequence(maxDuration * 1000);
 
     try {
       const res = await fetch("/api/case/open", { 
@@ -100,43 +107,40 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       
       resultRef.current = data.skins;
 
-      const pool = selectedCrate.contains || []
-      const newReel = Array.from({ length: 60 }).map(() => pool[Math.floor(Math.random() * pool.length)])
-      
-      const winningIndex = 55
-      
-      // ÇOKLU AÇMA GÖRSEL DÜZELTMESİ:
-      // Eğer 5'li açıldıysa, 5 skini de ibrenin tam ortasına yan yana diz.
-      if (quantity === 5 && data.skins.length === 5) {
-        newReel[53] = data.skins[0];
-        newReel[54] = data.skins[1];
-        newReel[55] = data.skins[2];
-        newReel[56] = data.skins[3];
-        newReel[57] = data.skins[4];
-      } else if (quantity === 3 && data.skins.length === 3) {
-        newReel[54] = data.skins[0];
-        newReel[55] = data.skins[1];
-        newReel[56] = data.skins[2];
-      } else if (data.skins.length > 0) {
-        newReel[55] = data.skins[0];
+      const newReels = [];
+      for (let q = 0; q < quantity; q++) {
+        const pool = selectedCrate.contains || [];
+        const reelItems = Array.from({ length: 60 }).map(() => pool[Math.floor(Math.random() * pool.length)]);
+        
+        if (data.skins[q]) {
+            reelItems[55] = data.skins[q];
+        }
+        
+        newReels.push({
+            id: q,
+            items: reelItems,
+            duration: durations[q] || 5.5,
+            target: "0px"
+        });
       }
-
-      setReel(newReel); 
+      
+      setReels(newReels); 
       setBalance(data.newBalance)
 
       setTimeout(() => {
-        if (containerRef.current) {
-          const containerWidth = containerRef.current.offsetWidth;
-          const containerCenter = containerWidth / 2;
-          const ITEM_WIDTH = 120; const GAP = 12; 
-          const totalItemWidth = ITEM_WIDTH + GAP;
-          
-          // İbreyi 55. elemana (tam ortaya) odakla
-          const itemCenterX = (winningIndex * totalItemWidth) + (ITEM_WIDTH / 2);
-          const randomOffset = (Math.random() - 0.5) * (ITEM_WIDTH - 40); 
-          setAnimationTarget(`${containerCenter - itemCenterX + randomOffset}px`)
-          setReelKey(prev => prev + 1)
-        }
+        const targets = rowRefs.current.map(ref => {
+            if (!ref) return "0px";
+            const containerCenter = ref.offsetWidth / 2;
+            const winningIndex = 55;
+            const ITEM_WIDTH = 120; const GAP = 12; 
+            const totalItemWidth = ITEM_WIDTH + GAP;
+            const itemCenterX = (winningIndex * totalItemWidth) + (ITEM_WIDTH / 2);
+            const randomOffset = (Math.random() - 0.5) * (ITEM_WIDTH - 40); 
+            return `${containerCenter - itemCenterX + randomOffset}px`;
+        });
+
+        setReels(prev => prev.map((reel, i) => ({ ...reel, target: targets[i] || "0px" })));
+        setReelKey(prev => prev + 1);
       }, 50)
 
     } catch (error) {
@@ -146,15 +150,18 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     }
   }
 
-  const handleAnimationComplete = () => {
-    if (isOpening && animationTarget !== 0) {
-      setIsOpening(false)
-      if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
-      
-      if (resultRef.current) {
-        setWonSkins(resultRef.current);
-      }
-    }
+  const handleRowAnimationComplete = () => {
+    setCompletedReels(prev => {
+        const next = prev + 1;
+        if (next === quantity) {
+            setIsOpening(false);
+            if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
+            if (resultRef.current) {
+                setWonSkins(resultRef.current);
+            }
+        }
+        return next;
+    });
   }
 
   const getRarityColor = (rarityName: string) => {
@@ -204,43 +211,57 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         </div>
       </div>
 
-      <div ref={containerRef} className="w-full relative py-12 overflow-hidden bg-[#050811] border border-white/10 rounded-md shadow-2xl">
-        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
-        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-        <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-
-        {isOpening ? (
-          <motion.div key={reelKey} className="flex gap-3" initial={{ x: 0 }} animate={{ x: animationTarget }} transition={{ duration: 4.5, ease: [0.1, 0.9, 0.2, 1] }} onAnimationComplete={handleAnimationComplete}>
-            {reel.map((skin, i) => (
-              <div key={i} className={`flex-shrink-0 w-[120px] h-36 bg-[#0a0f1c] border-2 rounded-sm p-2 flex flex-col items-center justify-between ${getRarityColor(skin.rarity.name)}`}>
-                <img src={skin.image} alt={skin.name} className="w-full h-20 object-contain drop-shadow-xl" />
-                <div className="text-center w-full bg-black/40 p-1 rounded-sm border-t border-white/5">
-                  <div className="text-[8px] text-zinc-500 uppercase tracking-widest">{skin.weapon?.name}</div>
-                  <div className="text-[10px] font-bold text-white truncate w-full">{skin.name}</div>
+      {isOpening ? (
+        <div className="flex flex-col gap-2 w-full">
+            {reels.map((reel, index) => (
+                <div key={index} className="w-full relative overflow-hidden bg-[#050811] border border-white/10 rounded-md py-2">
+                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
+                    <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                    <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                    
+                    <motion.div 
+                        key={`${reelKey}-${index}`} 
+                        className="flex gap-3" 
+                        initial={{ x: 0 }} 
+                        animate={{ x: reel.target }} 
+                        transition={{ duration: reel.duration, ease: [0.1, 0.9, 0.2, 1] }} 
+                        onAnimationComplete={handleRowAnimationComplete}
+                        ref={(el) => { rowRefs.current[index] = el }} // HATA BURADAYDI, DÜZELTİLDİ
+                    >
+                        {reel.items.map((skin, i) => (
+                            <div key={i} className={`flex-shrink-0 w-[120px] h-32 bg-[#0a0f1c] border-2 rounded-sm p-2 flex flex-col items-center justify-between ${getRarityColor(skin.rarity.name)}`}>
+                                <img src={skin.image} alt={skin.name} className="w-full h-16 object-contain drop-shadow-xl" />
+                                <div className="text-center w-full bg-black/40 p-1 rounded-sm border-t border-white/5">
+                                    <div className="text-[8px] text-zinc-500 uppercase tracking-widest">{skin.weapon?.name}</div>
+                                    <div className="text-[10px] font-bold text-white truncate w-full">{skin.name}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </motion.div>
                 </div>
-              </div>
             ))}
-          </motion.div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-36 gap-4">
-            <div className="flex items-center gap-2 bg-black/40 p-1 rounded-sm border border-white/10">
-              {[1, 3, 5].map(q => (
-                <button key={q} onClick={() => setQuantity(q)} className={`px-4 py-1.5 text-xs font-bold rounded-sm transition-colors ${quantity === q ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}>
-                  {q}x AÇ
-                </button>
-              ))}
-            </div>
+        </div>
+      ) : (
+        <div className="w-full relative py-12 overflow-hidden bg-[#050811] border border-white/10 rounded-md shadow-2xl">
+            <div className="flex flex-col items-center justify-center h-36 gap-4">
+                <div className="flex items-center gap-2 bg-black/40 p-1 rounded-sm border border-white/10">
+                {[1, 3, 5].map(q => (
+                    <button key={q} onClick={() => setQuantity(q)} className={`px-4 py-1.5 text-xs font-bold rounded-sm transition-colors ${quantity === q ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}>
+                    {q}x AÇ
+                    </button>
+                ))}
+                </div>
 
-            <button onClick={openCase} className="group relative bg-red-600/10 border border-red-500/30 p-1 rounded-md hover:bg-red-600/20 hover:scale-105 transition-all flex items-center gap-5 px-10 py-4 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
-              {selectedCrate && <img src={selectedCrate.image} alt={selectedCrate.name} className="w-14 h-14 group-hover:animate-bounce" />}
-              <div className="flex flex-col items-start">
-                <span className="text-lg font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${(CASE_PRICE * quantity).toFixed(2)})</span></span>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider">{selectedCrate?.name} (x{quantity})</span>
-              </div>
-            </button>
-          </div>
-        )}
-      </div>
+                <button onClick={openCase} className="group relative bg-red-600/10 border border-red-500/30 p-1 rounded-md hover:bg-red-600/20 hover:scale-105 transition-all flex items-center gap-5 px-10 py-4 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
+                {selectedCrate && <img src={selectedCrate.image} alt={selectedCrate.name} className="w-14 h-14 group-hover:animate-bounce" />}
+                <div className="flex flex-col items-start">
+                    <span className="text-lg font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${(CASE_PRICE * quantity).toFixed(2)})</span></span>
+                    <span className="text-[10px] text-zinc-400 uppercase tracking-wider">{selectedCrate?.name} (x{quantity})</span>
+                </div>
+                </button>
+            </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {!isOpening && wonSkins && wonSkins.length > 0 && (
