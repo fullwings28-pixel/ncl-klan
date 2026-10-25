@@ -21,6 +21,7 @@ export const RARITY_BASE_PRICES: Record<string, number> = {
   "Classified": 15.00,
   "Covert": 60.00,
   "Rare Special": 300.00,
+  "Rare Special Item": 300.00, // CS2 API bazen böyle gönderiyor
 };
 
 // SKİN İSMİNE GÖRE POPÜLERLİK VE FİYAT ÇARPANI
@@ -50,26 +51,28 @@ export function getSkinMultiplier(skinName: string) {
 export async function getEstimatedPrice(skin: any) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+    // DÜZELTME: API'nin bulabilmesi için ismin sonuna (Factory New) ekliyoruz.
+    const marketName = `${skin.name} (Factory New)`;
+    
     const response = await fetch(
-      `${baseUrl}/api/price?market_hash_name=${encodeURIComponent(skin.name)}`
+      `${baseUrl}/api/price?market_hash_name=${encodeURIComponent(marketName)}`
     );
     
     if (response.ok) {
       const data = await response.json();
-      // Eğer API'den geçerli ve 0'dan büyük bir fiyat geldiyse onu kullan
       if (data.price && data.price > 0) {
         return Number(data.price.toFixed(2));
       }
     }
   } catch (error) {
-    // API çökerse sessizce fallback'e geç
+    console.error("API fiyat çekme hatası, yedek sisteme geçiliyor:", error);
   }
 
-  // FALLBACK: API çalışmazsa veya fiyat bulamazsa, %100 garantili tahmin motoru
+  // FALLBACK (API ÇÖKERSE VEYA FİYAT BULAMAZSA)
   const rarityName = skin.rarity?.name || "Mil-Spec Grade";
   let basePrice = RARITY_BASE_PRICES[rarityName];
   
-  // Eğer nadirlik isminde uyuşmazlık varsa manuel eşleştir (Asla 1$ dönmesini engeller)
+  // Eğer nadirlik isminde uyuşmazlık varsa manuel eşleştir
   if (!basePrice) {
     if (rarityName.includes("Consumer")) basePrice = 0.05;
     else if (rarityName.includes("Industrial")) basePrice = 0.15;
@@ -78,7 +81,7 @@ export async function getEstimatedPrice(skin: any) {
     else if (rarityName.includes("Classified")) basePrice = 15.00;
     else if (rarityName.includes("Covert")) basePrice = 60.00;
     else if (rarityName.includes("Rare") || skin.weapon?.name === "Knife" || skin.weapon?.name === "Gloves") basePrice = 300.00;
-    else basePrice = 1.00;
+    else basePrice = 5.00; // 1.00 yerine en az 5.00 dolar yaptık ki saçmalamasın
   }
 
   const multiplier = getSkinMultiplier(skin.name);

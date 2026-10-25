@@ -51,7 +51,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     
     showToast("Fiyat hesaplanıyor...", "info")
 
-    // YENİ FALLBACK SİSTEMLİ FİYAT ÇEKME
     const estimatedPrice = await getEstimatedPrice(skin);
 
     setCaseItems(prev => [
@@ -426,7 +425,7 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                       {/* SADECE OKUNABİLİR FİYAT */}
                       <div className="flex flex-col items-center">
                         <label className="text-[8px] text-zinc-500 font-bold uppercase mb-0.5">Değer $</label>
-                        <div className="w-16 text-center text-xs text-green-400 font-black py-1">${item.price}</div>
+                        <div className="w-16 text-center text-xs text-green-400 font-black py-1">${Number(item.price).toFixed(2)}</div>
                       </div>
 
                       {/* SADECE ŞANS ORANI GİRİLEBİLİR */}
