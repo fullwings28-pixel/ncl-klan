@@ -1,16 +1,30 @@
 "use client"
 import { useState, useEffect } from "react"
 import Navbar from "@/components/Navbar"
-import { ShieldBan, ShieldCheck, VolumeX, ShieldAlert, Plus, Save, Megaphone, Coins, X, Flag, Trash } from "lucide-react"
+import { ShieldBan, ShieldCheck, VolumeX, ShieldAlert, Plus, Save, Megaphone, Coins, X, Flag, Trash, Sparkles, Wand2 } from "lucide-react"
 import { useToast } from "@/components/Toast"
 
 export default function AdminPanelClient({ users, logs, bannedWords, reports, adminProfile }: any) {
   const [reason, setReason] = useState("")
+  
+  // Ayarlar, Odalar, Duyurular State'leri
   const [siteName, setSiteName] = useState("")
   const [newRoomName, setNewRoomName] = useState("")
   const [rooms, setRooms] = useState<any[]>([])
   const [announcement, setAnnouncement] = useState("")
+  
+  // Kredi Verme Modalı
   const [creditModal, setCreditModal] = useState({ isOpen: false, userId: "", userName: "", amount: "" })
+
+  // KASA OLUŞTURMA STATE'LERİ (YENİ)
+  const [showCaseModal, setShowCaseModal] = useState(false)
+  const [caseName, setCaseName] = useState("")
+  const [casePrompt, setCasePrompt] = useState("")
+  const [casePrice, setCasePrice] = useState("2.50")
+  const [caseImageUrl, setCaseImageUrl] = useState("")
+  const [caseItems, setCaseItems] = useState<any[]>([])
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -31,7 +45,7 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
   }
 
   const submitCredits = async () => {
-    const amount = parseInt(creditModal.amount);
+    const amount = parseFloat(creditModal.amount);
     if (isNaN(amount) || amount === 0) return showToast("Geçerli bir sayı girin.", "error");
 
     const res = await fetch("/api/admin/give-credits", {
@@ -39,7 +53,7 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
       body: JSON.stringify({ targetUserId: creditModal.userId, amount })
     })
 
-    if (res.ok) { showToast(`${amount} Kredi işlendi!`, "success"); setCreditModal({ isOpen: false, userId: "", userName: "", amount: "" }); setTimeout(() => window.location.reload(), 1000) } 
+    if (res.ok) { showToast(`$${amount} işlendi!`, "success"); setCreditModal({ isOpen: false, userId: "", userName: "", amount: "" }); setTimeout(() => window.location.reload(), 1000) } 
     else { showToast("İşlem başarısız", "error") }
   }
 
@@ -64,12 +78,42 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     if(!word.trim()) return
     const res = await fetch("/api/admin/banned-words", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ word }) })
     if (res.ok) { showToast("Kelime eklendi!", "success"); setTimeout(() => window.location.reload(), 1000) } 
-    else { showToast("Kelime eklenemedi (Zaten var olabilir).", "error") }
+    else { showToast("Kelime eklenemedi.", "error") }
   }
 
   const handleDeleteBannedWord = async (id: number) => {
     await fetch(`/api/admin/banned-words?id=${id}`, { method: "DELETE" })
     showToast("Kelime silindi.", "success"); setTimeout(() => window.location.reload(), 1000)
+  }
+
+  // YAPAY ZEKA İLE KASA RESMİ OLUŞTURMA
+  const generateCaseImage = () => {
+    if (!casePrompt.trim()) return showToast("Lütfen bir görsel komutu girin.", "error")
+    setIsGeneratingImage(true)
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(casePrompt)}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random() * 10000)}`
+    setCaseImageUrl(url)
+    setTimeout(() => setIsGeneratingImage(false), 2000) // Görselin yüklenmesi için görsel bekleme efekti
+  }
+
+  // YENİ KASA KAYDETME
+  const handleSaveCase = async () => {
+    if (!caseName.trim() || !caseImageUrl || caseItems.length === 0) return showToast("Lütfen isim, resim ve en az bir eşya ekleyin.", "error")
+    
+    const totalChance = caseItems.reduce((sum, item) => sum + Number(item.chance), 0)
+    if (totalChance > 100) return showToast("Toplam şans %100'ü geçemez!", "error")
+
+    const res = await fetch("/api/admin/cases", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: caseName, image_url: caseImageUrl, price: parseFloat(casePrice), items: caseItems })
+    })
+    
+    if (res.ok) { 
+      showToast("Özel kasa başarıyla oluşturuldu!", "success")
+      setShowCaseModal(false)
+      setCaseName(""); setCaseImageUrl(""); setCaseItems([])
+    } else { 
+      showToast("Kasa oluşturulamadı.", "error") 
+    }
   }
 
   return (
@@ -155,6 +199,19 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
 
         </div>
 
+        {/* KASA YÖNETİMİ BUTONU */}
+        <div className="hud-panel p-5 rounded-md flex justify-between items-center border border-purple-500/30">
+          <div>
+            <h2 className="text-lg font-black text-white uppercase tracking-widest flex items-center gap-2">
+              <Sparkles className="text-purple-500" size={20}/> Özel Kasa Yönetimi
+            </h2>
+            <p className="text-zinc-400 text-xs mt-1">Yapay zeka ile klana özel kasalar oluştur.</p>
+          </div>
+          <button onClick={() => setShowCaseModal(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-sm text-xs font-black uppercase tracking-widest transition flex items-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+            <Plus size={16}/> Yeni Kasa Oluştur
+          </button>
+        </div>
+
         <div>
           <input type="text" placeholder="İŞLEM SEBEBİ (BAN/MUTE İÇİN)" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full bg-[#0a0f1c] rounded-sm border border-white/5 px-5 py-3 mb-4 text-xs font-bold focus:outline-none focus:border-red-500/50 text-white placeholder-zinc-600 tracking-widest" />
           
@@ -176,7 +233,7 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                         <img src={user.avatar_url} className="w-10 h-10 rounded-sm border border-white/10 object-cover grayscale-[30%]" alt="" />
                         <div className="flex flex-col">
                           <span className="font-bold text-white text-sm uppercase tracking-wide">{user.display_name}</span>
-                          <span className="text-[10px] text-yellow-500 font-bold flex items-center gap-1 mt-0.5 tracking-widest"><Coins size={10}/> {user.balance || 0} K</span>
+                          <span className="text-[10px] text-green-500 font-bold flex items-center gap-1 mt-0.5 tracking-widest">${Number(user.balance || 0).toFixed(2)}</span>
                         </div>
                       </div>
                     </td>
@@ -198,7 +255,7 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                        <button onClick={() => setCreditModal({ isOpen: true, userId: user.id, userName: user.display_name, amount: "" })} className="bg-yellow-500/10 hover:bg-yellow-600 text-yellow-500 hover:text-white px-2.5 py-1.5 rounded-sm text-[10px] font-bold transition flex items-center gap-1 border border-yellow-500/30 uppercase tracking-widest"><Coins size={12} /> KREDİ</button>
+                        <button onClick={() => setCreditModal({ isOpen: true, userId: user.id, userName: user.display_name, amount: "" })} className="bg-yellow-500/10 hover:bg-yellow-600 text-yellow-500 hover:text-white px-2.5 py-1.5 rounded-sm text-[10px] font-bold transition flex items-center gap-1 border border-yellow-500/30 uppercase tracking-widest"><Coins size={12} /> BAKİYE</button>
                         {user.is_banned ? <button onClick={() => handleAction(user.id, 'unban')} className="bg-white/5 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-sm text-[10px] font-bold transition border border-white/10 uppercase tracking-widest">BAN KALDIR</button> : <button onClick={() => handleAction(user.id, 'ban')} className="bg-red-500/10 hover:bg-red-600 text-red-500 hover:text-white px-2.5 py-1.5 rounded-sm text-[10px] font-bold transition border border-red-500/30 uppercase tracking-widest">BANLA</button>}
                         {user.is_muted ? <button onClick={() => handleAction(user.id, 'unmute')} className="bg-white/5 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-sm text-[10px] font-bold transition border border-white/10 uppercase tracking-widest">MUTE KALDIR</button> : <button onClick={() => handleAction(user.id, 'mute')} className="bg-yellow-500/10 hover:bg-yellow-600 text-yellow-500 hover:text-white px-2.5 py-1.5 rounded-sm text-[10px] font-bold transition border border-yellow-500/30 uppercase tracking-widest">MUTE</button>}
                       </div>
@@ -228,16 +285,17 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
         </div>
       </div>
 
+      {/* KREDİ VERME MODALI */}
       {creditModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setCreditModal({ ...creditModal, isOpen: false })}>
           <div className="hud-panel p-6 rounded-md max-w-sm w-full border border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.15)] relative" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setCreditModal({ ...creditModal, isOpen: false })} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition"><X size={20} /></button>
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-yellow-500/10 p-3 rounded-sm border border-yellow-500/30"><Coins className="text-yellow-500" size={24} /></div>
-              <div><h3 className="text-xl font-black text-white uppercase tracking-widest">KREDİ VER</h3><p className="text-[10px] text-yellow-500 font-bold tracking-widest mt-1">{creditModal.userName}</p></div>
+              <div><h3 className="text-xl font-black text-white uppercase tracking-widest">BAKİYE VER</h3><p className="text-[10px] text-yellow-500 font-bold tracking-widest mt-1">{creditModal.userName}</p></div>
             </div>
             <div className="space-y-4">
-              <input type="number" value={creditModal.amount} onChange={(e) => setCreditModal({ ...creditModal, amount: e.target.value })} placeholder="Örn: 500" className="w-full bg-black/50 border border-white/10 rounded-sm px-4 py-3 text-white focus:outline-none focus:border-yellow-500 font-black tracking-widest text-center text-lg" autoFocus />
+              <input type="number" value={creditModal.amount} onChange={(e) => setCreditModal({ ...creditModal, amount: e.target.value })} placeholder="Örn: 50.00" className="w-full bg-black/50 border border-white/10 rounded-sm px-4 py-3 text-white focus:outline-none focus:border-yellow-500 font-black tracking-widest text-center text-lg" autoFocus />
               <div className="flex gap-2">
                 <button onClick={() => setCreditModal({ ...creditModal, isOpen: false })} className="flex-1 bg-white/5 hover:bg-white/10 text-white py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest transition">İPTAL</button>
                 <button onClick={submitCredits} className="flex-1 bg-yellow-600/20 hover:bg-yellow-600 border border-yellow-500/30 text-yellow-500 hover:text-white py-2.5 rounded-sm text-xs font-bold transition uppercase tracking-widest">ONAYLA</button>
@@ -246,6 +304,90 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
           </div>
         </div>
       )}
+
+      {/* KASA OLUŞTURMA MODALI */}
+      {showCaseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto custom-scrollbar">
+          <div className="bg-[#0a0f1c] border border-white/10 p-6 rounded-md max-w-5xl w-full my-8 relative shadow-2xl">
+            <button onClick={() => setShowCaseModal(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={24}/></button>
+            
+            <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+              <Wand2 className="text-purple-500" size={28}/> Yapay Zeka Kasa Oluşturucu
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+              
+              {/* SOL TARAF: KASA BİLGİLERİ */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest block mb-1">Kasa İsmi</label>
+                  <input type="text" value={caseName} onChange={e => setCaseName(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded-sm px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500 font-bold" placeholder="Örn: NCL Seçkin Kasa" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest block mb-1">Kasa Fiyatı ($)</label>
+                  <input type="number" value={casePrice} onChange={e => setCasePrice(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded-sm px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500 font-bold" />
+                </div>
+                
+                <div className="border-t border-white/10 pt-4">
+                  <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest block mb-2">Yapay Zeka Resim Komutu</label>
+                  <div className="flex gap-2">
+                    <input type="text" value={casePrompt} onChange={e => setCasePrompt(e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded-sm px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500" placeholder="Örn: Futuristic neon weapon crate, dark background" />
+                    <button onClick={generateCaseImage} disabled={isGeneratingImage} className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-3 rounded-sm text-xs font-bold transition flex items-center gap-2 disabled:opacity-50 uppercase tracking-widest">
+                      {isGeneratingImage ? "Üretiliyor..." : "RESİM ÜRET"}
+                    </button>
+                  </div>
+                </div>
+
+                {caseImageUrl && (
+                  <div className="mt-4 p-4 bg-black/40 border border-white/10 rounded-sm flex flex-col items-center">
+                    <img src={caseImageUrl} alt="Kasa" className="w-48 h-48 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]" />
+                    <span className="text-[10px] text-green-500 font-bold mt-2 uppercase tracking-widest">Resim Hazır</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* SAĞ TARAF: İÇERİK EKLEME */}
+              <div className="bg-black/30 border border-white/5 p-5 rounded-md">
+                <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
+                  <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest">Kasa İçeriği</h3>
+                  <div className={`text-xs font-bold ${caseItems.reduce((sum, item) => sum + Number(item.chance), 0) > 100 ? "text-red-500" : "text-green-500"}`}>
+                    Toplam Şans: %{caseItems.reduce((sum, item) => sum + Number(item.chance), 0)}
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-[350px] overflow-y-auto custom-scrollbar pr-2">
+                  {caseItems.map((item, idx) => (
+                    <div key={idx} className="flex gap-2 items-center bg-black/40 p-2 border border-white/5 rounded-sm">
+                      <input type="text" value={item.skin_name} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].skin_name = e.target.value; setCaseItems(newItems); }} placeholder="Skin Adı" className="w-1/3 bg-[#050811] border border-white/10 rounded-sm px-2 py-1.5 text-xs text-white" />
+                      <input type="text" value={item.skin_image} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].skin_image = e.target.value; setCaseItems(newItems); }} placeholder="Resim URL" className="w-1/4 bg-[#050811] border border-white/10 rounded-sm px-2 py-1.5 text-xs text-white" />
+                      <select value={item.skin_rarity} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].skin_rarity = e.target.value; setCaseItems(newItems); }} className="w-24 bg-[#050811] border border-white/10 rounded-sm px-1 py-1.5 text-xs text-white uppercase">
+                        <option value="Mil-Spec Grade">Mavi</option>
+                        <option value="Restricted">Mor</option>
+                        <option value="Classified">Pembe</option>
+                        <option value="Covert">Kırmızı</option>
+                        <option value="Rare Special">Bıçak</option>
+                      </select>
+                      <input type="number" value={item.chance} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].chance = e.target.value; setCaseItems(newItems); }} placeholder="Şans %" className="w-16 bg-[#050811] border border-white/10 rounded-sm px-2 py-1.5 text-xs text-white" />
+                      <input type="number" value={item.price} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].price = e.target.value; setCaseItems(newItems); }} placeholder="Fiyat $" className="w-20 bg-[#050811] border border-white/10 rounded-sm px-2 py-1.5 text-xs text-white" />
+                      <button onClick={() => setCaseItems(caseItems.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-500/10 p-1.5 rounded-sm transition"><Trash size={14}/></button>
+                    </div>
+                  ))}
+                  {caseItems.length === 0 && <div className="text-center py-6 text-zinc-600 text-xs uppercase tracking-widest">Henüz eşya eklenmedi.</div>}
+                </div>
+                
+                <button onClick={() => setCaseItems([...caseItems, { skin_name: "", skin_image: "", skin_rarity: "Mil-Spec Grade", chance: "10", price: "1.50" }])} className="w-full mt-4 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold py-2.5 rounded-sm text-zinc-300 transition uppercase tracking-widest">
+                  + Yeni Eşya Ekle
+                </button>
+              </div>
+            </div>
+
+            <button onClick={handleSaveCase} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-sm text-sm uppercase tracking-widest transition shadow-[0_0_20px_rgba(168,85,247,0.3)]">
+              Kasayı Sisteme Kaydet
+            </button>
+          </div>
+        </div>
+      )}
+
     </main>
   )
 }

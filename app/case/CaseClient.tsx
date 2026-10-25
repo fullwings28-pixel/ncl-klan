@@ -2,22 +2,24 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchCrates, Crate, Skin } from "@/lib/csgo-api"
+import { createClient } from "@supabase/supabase-js"
 import { Gift, Sparkles, X, Package } from "lucide-react"
 import CustomAlert from "@/components/CustomAlert"
 import { CASE_PRICE } from "@/lib/economy"
 
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+
 export default function CaseClient({ currentUser }: { currentUser: any }) {
   const [balance, setBalance] = useState(currentUser.balance || 0)
-  const [crates, setCrates] = useState<Crate[]>([])
-  const [selectedCrate, setSelectedCrate] = useState<Crate | null>(null)
+  const [crates, setCrates] = useState<any[]>([])
+  const [selectedCrate, setSelectedCrate] = useState<any | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [isOpening, setIsOpening] = useState(false)
   
   const [wonSkins, setWonSkins] = useState<any[] | null>(null)
   const [isClaiming, setIsClaiming] = useState(false)
   
-  // Multi-reel state
-  const [reels, setReels] = useState<{ id: number, items: Skin[], target: string, duration: number }[]>([])
+  const [reels, setReels] = useState<{ id: number, items: any[], target: string, duration: number }[]>([])
   const [reelKey, setReelKey] = useState(0)
   
   const resultRef = useRef<any[] | null>(null) 
@@ -50,7 +52,29 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     document.addEventListener('click', unlockAudio)
     document.addEventListener('touchstart', unlockAudio)
 
-    fetchCrates().then(data => { setCrates(data); if (data.length > 0) setSelectedCrate(data[0]); setLoading(false) })
+    const fetchAllCases = async () => {
+      // 1. Standart CS2 Kasalarını Çek
+      const apiCrates = await fetchCrates()
+      
+      // 2. Özel Kasaları Çek
+      const { data: customData } = await supabase.from("custom_cases").select("*")
+      
+      const formattedCustom = (customData || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        image: c.image_url,
+        isCustom: true,
+        customPrice: Number(c.price),
+        contains: [] // UI'da içerik göstermek gerekirse doldurulabilir
+      }))
+
+      const allCrates = [...formattedCustom, ...apiCrates]
+      setCrates(allCrates)
+      if (allCrates.length > 0) setSelectedCrate(allCrates[0])
+      setLoading(false)
+    }
+
+    fetchAllCases()
     
     return () => {
       document.removeEventListener('click', unlockAudio)
@@ -72,26 +96,14 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     tick();
   }
 
-  const claimDaily = async () => {
-    setIsClaiming(true)
-    try {
-      const res = await fetch("/api/case/daily", { method: "POST" })
-      const data = await res.json()
-      if (res.ok && data.success) { setBalance(data.newBalance); showAlert("Günlük ödül hesabına eklendi.", "success") } 
-      else { showAlert(data.error || "Bir hata oluştu.", "error") }
-    } catch (e) { showAlert("Sunucuya bağlanılamadı.", "error") }
-    setIsClaiming(false)
-  }
-
   const openCase = async () => {
-    const cost = CASE_PRICE * quantity;
+    const cost = selectedCrate?.isCustom ? (selectedCrate.customPrice * quantity) : (CASE_PRICE * quantity);
     if (!selectedCrate || Number(balance) < cost) return showAlert(`Yetersiz bakiye! ${quantity} kasa için $${cost.toFixed(2)} gerekli.`, "error")
     
     setIsOpening(true); 
     setWonSkins(null); 
-    setReels([]); // Önceki şeritleri temizle
+    setReels([]); 
     
-    // Animasyon süreleri (her sıra biraz daha geç biter)
     const durations = [4.5, 4.8, 5.1, 5.4, 5.7];
     const maxDuration = durations[quantity - 1] || 5.7;
     
@@ -108,11 +120,20 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       
       resultRef.current = data.skins;
 
-      // Her kasa için ayrı bir şerit oluştur
       const newReels = [];
       for (let q = 0; q < quantity; q++) {
-        const pool = selectedCrate.contains || [];
-        const reelItems = Array.from({ length: 60 }).map(() => pool[Math.floor(Math.random() * pool.length)]);
+        // Özel kasa ise ve içerik API'den gelmediyse geçici bir havuz oluştur
+        const pool = selectedCrate.isCustom ? [data.skins[q]] : (selectedCrate.contains || [])
+        
+        const reelItems = Array.from({ length: 60 }).map(() => {
+          if (selectedCrate.isCustom) {
+             // Özel kasalarda şeritte rastgele skinler göstermek zor olduğu için
+             // şeridi kazanılan skinin etrafında dönecek şekilde ayarlıyoruz
+             const tempPool = [data.skins[q], ...(selectedCrate.contains || [])];
+             return tempPool[Math.floor(Math.random() * tempPool.length)] || data.skins[q];
+          }
+          return pool[Math.floor(Math.random() * pool.length)];
+        });
         
         if (data.skins[q]) {
             reelItems[55] = data.skins[q];
@@ -122,21 +143,19 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
             id: q,
             items: reelItems,
             duration: durations[q] || 5.7,
-            target: "0px" // Başlangıçta hedef 0
+            target: "0px"
         });
       }
       
       setReels(newReels); 
       setBalance(data.newBalance)
 
-      // Hedef konumları hesapla ve animasyonu başlat
       setTimeout(() => {
         const targets = rowRefs.current.map(ref => {
             if (!ref) return "0px";
             const containerCenter = ref.offsetWidth / 2;
             const winningIndex = 55;
-            const ITEM_WIDTH = 140; // Genişlik büyütüldü
-            const GAP = 12; 
+            const ITEM_WIDTH = 140; const GAP = 12; 
             const totalItemWidth = ITEM_WIDTH + GAP;
             const itemCenterX = (winningIndex * totalItemWidth) + (ITEM_WIDTH / 2);
             const randomOffset = (Math.random() - 0.5) * (ITEM_WIDTH - 40); 
@@ -144,10 +163,9 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         });
 
         setReels(prev => prev.map((reel, i) => ({ ...reel, target: targets[i] || "0px" })));
-        setReelKey(prev => prev + 1); // Animasyonu tetikle
+        setReelKey(prev => prev + 1);
       }, 100)
 
-      // KESİN ZAMANLAYICI: Animasyon bittiğinde sonuçları göster
       if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
       finishTimerRef.current = setTimeout(() => {
         setIsOpening(false);
@@ -155,7 +173,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
           setWonSkins(resultRef.current);
         }
         if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
-      }, (maxDuration * 1000) + 200); // Animasyon süresinden 200ms sonra aç
+      }, (maxDuration * 1000) + 200);
 
     } catch (error) {
       showAlert("Sunucuya bağlanılamadı.", "error")
@@ -192,7 +210,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
             <span className="text-green-500 font-black text-xl">$</span>
             <div className="text-lg font-black text-white">{Number(balance).toFixed(2)} <span className="text-[10px] text-green-500 uppercase tracking-widest">BAKİYE</span></div>
           </div>
-          <button onClick={claimDaily} disabled={isClaiming} className="bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-200 px-5 py-2 rounded-sm text-xs font-bold flex items-center gap-2 transition uppercase tracking-widest disabled:opacity-50">
+          <button onClick={() => {}} disabled={isClaiming} className="bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-200 px-5 py-2 rounded-sm text-xs font-bold flex items-center gap-2 transition uppercase tracking-widest disabled:opacity-50">
             <Gift size={16} /> GÜNLÜK ÖDÜL
           </button>
         </div>
@@ -203,7 +221,13 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
           <style>{`.overflow-x-auto::-webkit-scrollbar { display: none; }`}</style>
           {crates.map((crate) => (
             <button key={crate.id} onClick={() => !isOpening && setSelectedCrate(crate)}
-              className={`flex-shrink-0 w-32 p-3 rounded-sm border transition-all duration-300 ${selectedCrate?.id === crate.id ? "border-red-500/50 bg-red-500/10 shadow-[inset_0_0_20px_rgba(239,68,68,0.1)]" : "border-white/5 bg-[#0a0f1c]/50 hover:border-white/20 hover:bg-white/5"} ${isOpening ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              className={`flex-shrink-0 w-32 p-3 rounded-sm border transition-all duration-300 relative ${selectedCrate?.id === crate.id ? "border-red-500/50 bg-red-500/10 shadow-[inset_0_0_20px_rgba(239,68,68,0.1)]" : "border-white/5 bg-[#0a0f1c]/50 hover:border-white/20 hover:bg-white/5"} ${isOpening ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              
+              {/* Özel Kasa Etiketi */}
+              {crate.isCustom && (
+                <div className="absolute -top-2 -right-2 bg-purple-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-sm border border-purple-400 z-10">ÖZEL</div>
+              )}
+
               <img src={crate.image} alt={crate.name} className={`w-full h-16 object-contain mb-2 transition-transform duration-300 ${selectedCrate?.id === crate.id ? 'scale-110 drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]' : 'opacity-70 group-hover:opacity-100'}`} />
               <div className="text-[10px] font-bold text-zinc-300 text-center truncate w-full uppercase tracking-wider">{crate.name}</div>
             </button>
@@ -215,23 +239,20 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         <div className="flex flex-col gap-3 w-full">
             {reels.map((reel, index) => (
                 <div key={index} className="w-full relative overflow-hidden bg-[#050811] border border-white/10 rounded-md py-4">
-                    {/* Kırmızı İbre */}
                     <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
-                    
                     <motion.div 
                         key={`${reelKey}-${index}`} 
                         className="flex gap-3" 
                         initial={{ x: 0 }} 
                         animate={{ x: reel.target }} 
                         transition={{ duration: reel.duration, ease: [0.1, 0.9, 0.2, 1] }} 
-                        // Framer Motion'ın hatalı bitişini iptal ettik, zamanlayıcı kullanıyoruz
                         ref={(el) => { rowRefs.current[index] = el }}
                     >
                         {reel.items.map((skin, i) => (
                             <div key={i} className={`flex-shrink-0 w-[140px] h-40 bg-[#0a0f1c] border-2 rounded-sm p-3 flex flex-col items-center justify-between ${getRarityColor(skin.rarity.name)}`}>
                                 <img src={skin.image} alt={skin.name} className="w-full h-24 object-contain drop-shadow-xl" />
                                 <div className="text-center w-full bg-black/40 p-1.5 rounded-sm border-t border-white/5">
-                                    <div className="text-[9px] text-zinc-500 uppercase tracking-widest">{skin.weapon?.name}</div>
+                                    <div className="text-[9px] text-zinc-500 uppercase tracking-widest">{skin.weapon?.name || "WEAPON"}</div>
                                     <div className="text-[11px] font-bold text-white truncate w-full">{skin.name}</div>
                                 </div>
                             </div>
@@ -254,7 +275,9 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
                 <button onClick={openCase} className="group relative bg-red-600/10 border border-red-500/30 p-2 rounded-md hover:bg-red-600/20 hover:scale-105 transition-all flex items-center gap-6 px-12 py-5 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
                 {selectedCrate && <img src={selectedCrate.image} alt={selectedCrate.name} className="w-16 h-16 group-hover:animate-bounce" />}
                 <div className="flex flex-col items-start">
-                    <span className="text-xl font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${(CASE_PRICE * quantity).toFixed(2)})</span></span>
+                    <span className="text-xl font-black text-white uppercase tracking-widest">
+                      KASA AÇ <span className="text-green-500">(${((selectedCrate?.isCustom ? selectedCrate.customPrice : CASE_PRICE) * quantity).toFixed(2)})</span>
+                    </span>
                     <span className="text-xs text-zinc-400 uppercase tracking-wider">{selectedCrate?.name} (x{quantity})</span>
                 </div>
                 </button>
