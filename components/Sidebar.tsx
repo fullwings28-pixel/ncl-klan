@@ -1,6 +1,6 @@
 "use client"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, MessageSquare, Send, Gamepad2, Package, Swords, Crown, Map, Calendar, Target, Users, ShieldAlert, LogOut } from "lucide-react"
+import { X, MessageSquare, Send, Gamepad2, Package, Swords, Crown, Map, Calendar, Target, Users, ShieldAlert, LogOut, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
@@ -33,9 +33,10 @@ export default function Sidebar({ isOpen, onClose, profile }: SidebarProps) {
       title: "Oyun & Eğlence",
       links: [
         { name: "Kasa Aç", href: "/case", icon: Gamepad2, color: "text-yellow-500" },
+        { name: "Upgrade", href: "/upgrade", icon: ArrowUpRight, color: "text-green-500" }, // <-- YENİ EKLENDİ
+        { name: "Kasa Savaşı", href: "/battle", icon: Swords, color: "text-orange-500" },
         { name: "Envanter", href: "/inventory", icon: Package, color: "text-green-400" },
         { name: "1v1 Arena", href: "/arena", icon: Swords, color: "text-red-400" },
-        { name: "Kasa Savaşı", href: "/battle", icon: Swords, color: "text-orange-500" },
       ]
     },
     {
@@ -126,7 +127,6 @@ export default function Sidebar({ isOpen, onClose, profile }: SidebarProps) {
               )}
             </div>
 
-            {/* ALT KISIM: PROFİL VE ÇIKIŞ */}
             <div className="p-4 border-t border-white/5 bg-black/20 flex flex-col gap-2">
               <Link href="/dashboard" onClick={onClose} className="flex items-center gap-3 bg-[#0a0f1c] p-3 rounded-sm border border-white/10 hover:border-red-500/50 transition-colors group">
                 <img src={profile?.avatar_url} alt="Profile" className="w-10 h-10 rounded-sm border border-white/20 grayscale group-hover:grayscale-0 transition-all" />
@@ -136,7 +136,6 @@ export default function Sidebar({ isOpen, onClose, profile }: SidebarProps) {
                 </div>
               </Link>
               
-              {/* ÇIKIŞ YAP BUTONU */}
               <button 
                 onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 py-2.5 rounded-sm text-xs font-black uppercase tracking-widest transition-colors"
