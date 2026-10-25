@@ -1,10 +1,10 @@
 "use client"
 import { useState, useEffect } from "react"
 import Navbar from "@/components/Navbar"
-import { ShieldBan, ShieldCheck, VolumeX, ShieldAlert, Plus, Save, Coins, X, Flag, Trash, Sparkles, Wand2, Search } from "lucide-react"
+import { ShieldBan, ShieldCheck, VolumeX, ShieldAlert, Plus, Save, Coins, X, Flag, Trash, Sparkles, Wand2, Search, Calculator } from "lucide-react"
 import { useToast } from "@/components/Toast"
 import { fetchSkins, Skin } from "@/lib/csgo-api"
-import { getWear, getFloatMultiplier, getSkinMultiplier, RARITY_BASE_PRICES } from "@/lib/economy"
+import { RARITY_BASE_PRICES, getSkinMultiplier } from "@/lib/economy"
 
 export default function AdminPanelClient({ users, logs, bannedWords, reports, adminProfile }: any) {
   const [reason, setReason] = useState("")
@@ -22,7 +22,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
   const [showCaseModal, setShowCaseModal] = useState(false)
   const [caseName, setCaseName] = useState("")
   const [casePrompt, setCasePrompt] = useState("")
-  const [casePrice, setCasePrice] = useState("2.50")
   const [caseImageUrl, setCaseImageUrl] = useState("")
   const [caseItems, setCaseItems] = useState<any[]>([])
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
@@ -51,12 +50,12 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     }
   }
 
-  // Skin Seçildiğinde forma ekle
+  // Skin Seçildiğinde forma ekle (SADECE ŞANS BELİRLENECEK, FİYAT OTOMATİK)
   const handleSelectSkin = (skin: Skin) => {
-    // Skinin tahmini fiyatını hesapla (Nadirlik + Popülerlik)
+    // Skinin piyasa değerini hesapla
     const basePrice = RARITY_BASE_PRICES[skin.rarity.name] || 1.00
     const multiplier = getSkinMultiplier(skin.name)
-    const estimatedPrice = (basePrice * multiplier).toFixed(2)
+    const estimatedPrice = Number((basePrice * multiplier).toFixed(2))
 
     setCaseItems([
       ...caseItems, 
@@ -66,7 +65,7 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
         skin_image: skin.image, 
         skin_rarity: skin.rarity.name, 
         chance: "10", // Varsayılan %10 şans
-        price: estimatedPrice 
+        price: estimatedPrice // Fiyat otomatik atanır ve kilitlenir
       }
     ])
     setIsSkinPickerOpen(false)
@@ -78,6 +77,20 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     s.name.toLowerCase().includes(skinSearch.toLowerCase()) || 
     s.weapon?.name.toLowerCase().includes(skinSearch.toLowerCase())
   )
+
+  // OTOMATİK KASA FİYATI HESAPLAMA (Beklenen Değer + %10 Kâr Marjı)
+  const calculateCasePrice = () => {
+    const totalExpectedValue = caseItems.reduce((acc, item) => {
+      return acc + (Number(item.price) * (Number(item.chance) / 100))
+    }, 0)
+    
+    // Eğer hiç eşya yoksa 0 dön
+    if (totalExpectedValue === 0) return "0.00"
+
+    // %15 Kâr Marjı ekleyelim ki sistem zarar etmesin (Kasa fiyatı her zaman içindekilerin beklenen değerinden yüksek olmalı)
+    const finalPrice = totalExpectedValue * 1.15 
+    return finalPrice.toFixed(2)
+  }
 
   const handleAction = async (userId: string, action: string) => {
     const res = await fetch("/api/admin/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ targetUserId: userId, action, reason }) })
@@ -146,10 +159,13 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     
     const totalChance = caseItems.reduce((sum, item) => sum + Number(item.chance), 0)
     if (totalChance > 100) return showToast("Toplam şans %100'ü geçemez!", "error")
+    if (totalChance < 100) return showToast("Toplam şansın %100 olması gerekir!", "error")
+
+    const finalPrice = Number(calculateCasePrice())
 
     const res = await fetch("/api/admin/cases", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: caseName, image_url: caseImageUrl, price: parseFloat(casePrice), items: caseItems })
+      body: JSON.stringify({ name: caseName, image_url: caseImageUrl, price: finalPrice, items: caseItems })
     })
     
     if (res.ok) { 
@@ -367,10 +383,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                   <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest block mb-1">Kasa İsmi</label>
                   <input type="text" value={caseName} onChange={e => setCaseName(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded-sm px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500 font-bold" placeholder="Örn: NCL Seçkin Kasa" />
                 </div>
-                <div>
-                  <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest block mb-1">Kasa Fiyatı ($)</label>
-                  <input type="number" value={casePrice} onChange={e => setCasePrice(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded-sm px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500 font-bold" />
-                </div>
                 
                 <div className="border-t border-white/10 pt-4">
                   <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest block mb-2">Yapay Zeka Resim Komutu</label>
@@ -388,6 +400,19 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                     <span className="text-[10px] text-green-500 font-bold mt-2 uppercase tracking-widest">Resim Hazır</span>
                   </div>
                 )}
+
+                {/* OTOMATİK FİYAT GÖSTERGESİ */}
+                <div className="mt-4 bg-purple-500/10 border border-purple-500/30 rounded-sm p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Calculator className="text-purple-400" size={28} />
+                    <div>
+                      <div className="text-[10px] text-purple-300 font-bold uppercase tracking-widest">Otomatik Kasa Fiyatı</div>
+                      <div className="text-[9px] text-zinc-400 mt-0.5">Eşyaların beklenen değerine göre +%15 kâr marjı</div>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-black text-white">${calculateCasePrice()}</div>
+                </div>
+
               </div>
               
               {/* SAĞ TARAF: İÇERİK EKLEME */}
@@ -407,14 +432,19 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                         <div className="text-[10px] font-bold text-white truncate">{item.skin_name}</div>
                         <div className="text-[8px] text-zinc-500 uppercase">{item.skin_rarity}</div>
                       </div>
+                      
+                      {/* SADECE OKUNABİLİR FİYAT */}
                       <div className="flex flex-col items-center">
-                        <label className="text-[8px] text-zinc-500 font-bold uppercase mb-0.5">Şans %</label>
-                        <input type="number" value={item.chance} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].chance = e.target.value; setCaseItems(newItems); }} className="w-16 bg-[#050811] border border-white/10 rounded-sm px-2 py-1 text-center text-xs text-white" />
+                        <label className="text-[8px] text-zinc-500 font-bold uppercase mb-0.5">Değer $</label>
+                        <div className="w-16 text-center text-xs text-green-400 font-black py-1">${item.price}</div>
                       </div>
+
+                      {/* SADECE ŞANS ORANI GİRİLEBİLİR */}
                       <div className="flex flex-col items-center">
-                        <label className="text-[8px] text-zinc-500 font-bold uppercase mb-0.5">Fiyat $</label>
-                        <input type="number" value={item.price} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].price = e.target.value; setCaseItems(newItems); }} className="w-20 bg-[#050811] border border-white/10 rounded-sm px-2 py-1 text-center text-xs text-white" />
+                        <label className="text-[8px] text-purple-400 font-bold uppercase mb-0.5">Şans %</label>
+                        <input type="number" value={item.chance} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].chance = e.target.value; setCaseItems(newItems); }} className="w-16 bg-[#050811] border border-purple-500/30 rounded-sm px-2 py-1 text-center text-xs text-white focus:border-purple-500" />
                       </div>
+                      
                       <button onClick={() => setCaseItems(caseItems.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-500/10 p-1.5 rounded-sm transition self-end mb-0.5"><Trash size={14}/></button>
                     </div>
                   ))}
