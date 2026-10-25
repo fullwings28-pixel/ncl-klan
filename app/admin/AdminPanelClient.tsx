@@ -9,16 +9,13 @@ import { getEstimatedPrice } from "@/lib/economy"
 export default function AdminPanelClient({ users, logs, bannedWords, reports, adminProfile }: any) {
   const [reason, setReason] = useState("")
   
-  // Ayarlar, Odalar, Duyurular State'leri
   const [siteName, setSiteName] = useState("")
   const [newRoomName, setNewRoomName] = useState("")
   const [rooms, setRooms] = useState<any[]>([])
   const [announcement, setAnnouncement] = useState("")
   
-  // Kredi Verme Modalı
   const [creditModal, setCreditModal] = useState({ isOpen: false, userId: "", userName: "", amount: "" })
 
-  // KASA OLUŞTURMA STATE'LERİ
   const [showCaseModal, setShowCaseModal] = useState(false)
   const [caseName, setCaseName] = useState("")
   const [casePrompt, setCasePrompt] = useState("")
@@ -26,7 +23,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
   const [caseItems, setCaseItems] = useState<any[]>([])
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
 
-  // SKİN SEÇİCİ (SKIN PICKER) STATE'LERİ
   const [isSkinPickerOpen, setIsSkinPickerOpen] = useState(false)
   const [allSkins, setAllSkins] = useState<Skin[]>([])
   const [skinSearch, setSkinSearch] = useState("")
@@ -39,7 +35,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     fetch("/api/rooms").then(res => res.json()).then(data => setRooms(data))
   }, [])
 
-  // Skin Picker açıldığında tüm skinleri çek
   const openSkinPicker = async () => {
     setIsSkinPickerOpen(true)
     if (allSkins.length === 0) {
@@ -50,15 +45,13 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     }
   }
 
-  // Skin Seçildiğinde forma ekle (CS2Cap API üzerinden fiyat çeker)
   const handleSelectSkin = async (skin: Skin) => {
     setIsSkinPickerOpen(false)
     setSkinSearch("")
     
-    // Yükleniyor bildirimi göster
     showToast("Fiyat hesaplanıyor...", "info")
 
-    // Fiyatı CS2Cap API'sinden çek (veya fallback kullan)
+    // YENİ FALLBACK SİSTEMLİ FİYAT ÇEKME
     const estimatedPrice = await getEstimatedPrice(skin);
 
     setCaseItems(prev => [
@@ -75,20 +68,16 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     showToast(`${skin.name} eklendi ($${estimatedPrice})`, "success")
   }
 
-  // Filtrelenmiş skinler
   const filteredSkins = allSkins.filter(s => 
     s.name.toLowerCase().includes(skinSearch.toLowerCase()) || 
     s.weapon?.name.toLowerCase().includes(skinSearch.toLowerCase())
   )
 
-  // OTOMATİK KASA FİYATI HESAPLAMA (Beklenen Değer + %15 Kâr Marjı)
   const calculateCasePrice = () => {
     const totalExpectedValue = caseItems.reduce((acc, item) => {
       return acc + (Number(item.price) * (Number(item.chance) / 100))
     }, 0)
-    
     if (totalExpectedValue === 0) return "0.00"
-
     const finalPrice = totalExpectedValue * 1.15 
     return finalPrice.toFixed(2)
   }
