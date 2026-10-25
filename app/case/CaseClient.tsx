@@ -1,9 +1,9 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { fetchCrates, Crate, Skin } from "@/lib/csgo-api"
+import { fetchCrates } from "@/lib/csgo-api"
 import { supabase } from "@/lib/supabaseClient"
-import { Gift, Sparkles, X, Package, Coins } from "lucide-react"
+import { Sparkles, Package, Coins } from "lucide-react"
 import CustomAlert from "@/components/CustomAlert"
 import { CASE_PRICE } from "@/lib/economy"
 
@@ -27,9 +27,9 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   const tickAudioRef = useRef<HTMLAudioElement | null>(null)
   const tickTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false)
-
   const [loading, setLoading] = useState(true)
   const [alertState, setAlertState] = useState({ isOpen: false, message: "", type: "info" as "info" | "error" | "success" })
+
   const showAlert = (message: string, type: "info" | "error" | "success" = "info") => setAlertState({ isOpen: true, message, type })
 
   useEffect(() => {
@@ -45,7 +45,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       document.removeEventListener('click', unlockAudio)
       document.removeEventListener('touchstart', unlockAudio)
     }
-
     document.addEventListener('click', unlockAudio)
     document.addEventListener('touchstart', unlockAudio)
 
@@ -53,19 +52,18 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       const apiCrates = await fetchCrates()
       const { data: customData } = await supabase.from("custom_cases").select("*")
       const formattedCustom = (customData || []).map(c => ({
-        id: c.id, name: c.name, image: c.image_url, isCustom: true, customPrice: Number(c.price), contains: []
+        id: c.id, name: c.name, image: c.image_url, isCustom: true, customPrice: Number(c.price), contains: c.items || []
       }))
-
       const allCrates = [...formattedCustom, ...apiCrates]
       setCrates(allCrates)
       if (allCrates.length > 0) setSelectedCrate(allCrates[0])
       setLoading(false)
     }
-
     fetchAllCases()
     
     return () => {
       document.removeEventListener('click', unlockAudio)
+      document.removeEventListener('touchstart', unlockAudio)
       if (tickTimerRef.current) clearTimeout(tickTimerRef.current)
       if (finishTimerRef.current) clearTimeout(finishTimerRef.current)
     }
@@ -112,7 +110,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       
       const data = await res.json();
       
-      // GÜVENLİK KONTROLÜ: Eğer API'den skinler gelmezse çökmeyi engelle
       if (!data.skins || !Array.isArray(data.skins) || data.skins.length === 0) {
         showAlert("Kasa açılamadı, eşyalar gelmedi.", "error");
         setIsOpening(false);
@@ -120,28 +117,26 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       }
 
       resultRef.current = data.skins;
-
       const newReels = [];
+
       for (let q = 0; q < quantity; q++) {
-        const pool = selectedCrate.isCustom ? [data.skins[q]] : (selectedCrate.contains || [])
+        const pool = (selectedCrate.contains && selectedCrate.contains.length > 0) 
+          ? selectedCrate.contains 
+          : data.skins;
         
         const reelItems = Array.from({ length: 60 }).map(() => {
-          if (selectedCrate.isCustom) {
-             const tempPool = [data.skins[q], ...(selectedCrate.contains || [])];
-             return tempPool[Math.floor(Math.random() * tempPool.length)] || data.skins[q];
-          }
-          return pool[Math.floor(Math.random() * pool.length)];
+          return pool[Math.floor(Math.random() * pool.length)] || data.skins[q];
         });
         
         if (data.skins[q]) {
-            reelItems[55] = data.skins[q];
+          reelItems[55] = data.skins[q];
         }
         
         newReels.push({
-            id: q,
-            items: reelItems,
-            duration: durations[q] || 5.7,
-            target: "0px"
+          id: q,
+          items: reelItems,
+          duration: durations[q] || 5.7,
+          target: "0px"
         });
       }
       
@@ -150,16 +145,15 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
 
       setTimeout(() => {
         const targets = rowRefs.current.map(ref => {
-            if (!ref) return "0px";
-            const containerCenter = ref.offsetWidth / 2;
-            const winningIndex = 55;
-            const ITEM_WIDTH = 140; const GAP = 12; 
-            const totalItemWidth = ITEM_WIDTH + GAP;
-            const itemCenterX = (winningIndex * totalItemWidth) + (ITEM_WIDTH / 2);
-            const randomOffset = (Math.random() - 0.5) * (ITEM_WIDTH - 40); 
-            return `${containerCenter - itemCenterX + randomOffset}px`;
+          if (!ref) return "0px";
+          const containerCenter = ref.offsetWidth / 2;
+          const winningIndex = 55;
+          const ITEM_WIDTH = 140; const GAP = 12; 
+          const totalItemWidth = ITEM_WIDTH + GAP;
+          const itemCenterX = (winningIndex * totalItemWidth) + (ITEM_WIDTH / 2);
+          const randomOffset = (Math.random() - 0.5) * (ITEM_WIDTH - 40); 
+          return `${containerCenter - itemCenterX + randomOffset}px`;
         });
-
         setReels(prev => prev.map((reel, i) => ({ ...reel, target: targets[i] || "0px" })));
         setReelKey(prev => prev + 1);
       }, 100)
@@ -183,14 +177,12 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   const handleClaim = async (action: 'save' | 'sell') => {
     if (!wonSkins) return
     setIsClaiming(true)
-
     const res = await fetch("/api/case/claim", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ skins: wonSkins, action })
     })
     
     const data = await res.json()
-
     if (res.ok) {
       if (action === 'save') {
         showAlert("Eşyalar envanterine eklendi!", "success")
@@ -205,7 +197,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     setIsClaiming(false)
   }
 
-  const getRarityColor = (rarityName: string) => {
+  const getRarityColor = (rarityName?: string) => {
     switch (rarityName) {
       case "Rare Special": return "text-yellow-400 border-yellow-400 bg-yellow-500/10"
       case "Covert": return "text-red-500 border-red-500 bg-red-500/10"
@@ -252,43 +244,51 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
 
       {isOpening ? (
         <div className="flex flex-col gap-3 w-full">
-            {reels.map((reel, index) => (
-                <div key={index} className="w-full relative overflow-hidden bg-[#050811] border border-white/10 rounded-md py-4">
-                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
-                    <motion.div key={`${reelKey}-${index}`} className="flex gap-3" initial={{ x: 0 }} animate={{ x: reel.target }} transition={{ duration: reel.duration, ease: [0.1, 0.9, 0.2, 1] }} ref={(el) => { rowRefs.current[index] = el }}>
-                        {reel.items.map((skin, i) => (
-                            <div key={i} className={`flex-shrink-0 w-[140px] h-40 bg-[#0a0f1c] border-2 rounded-sm p-3 flex flex-col items-center justify-between ${skin ? getRarityColor(skin.rarity.name) : 'border-gray-700'}`}>
-                                {skin ? (
-                                  <>
-                                    <img src={skin.image} alt={skin.name} className="w-full h-24 object-contain drop-shadow-xl" />
-                                    <div className="text-center w-full bg-black/40 p-1.5 rounded-sm border-t border-white/5">
-                                        <div className="text-[9px] text-zinc-500 uppercase tracking-widest">{skin.weapon?.name || "WEAPON"}</div>
-                                        <div className="text-[11px] font-bold text-white truncate w-full">{skin.name}</div>
-                                    </div>
-                                  </>
-                                ) : null}
-                            </div>
-                        ))}
-                    </motion.div>
-                </div>
-            ))}
+          {reels.map((reel, index) => (
+            <div key={index} className="w-full relative overflow-hidden bg-[#050811] border border-white/10 rounded-md py-4">
+              <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
+              <motion.div key={`${reelKey}-${index}`} className="flex gap-3" initial={{ x: 0 }} animate={{ x: reel.target }} transition={{ duration: reel.duration, ease: [0.1, 0.9, 0.2, 1] }} ref={(el) => { rowRefs.current[index] = el }}>
+                {reel.items.map((skin, i) => {
+                  // HEM NORMAL SKIN HEM DE KAZANILAN SKIN FORMATINI DESTEKLE
+                  const rarityName = skin?.rarity?.name || skin?.skin_rarity || "Mil-Spec Grade"
+                  const skinImage = skin?.image || skin?.skin_image || ""
+                  const skinName = skin?.name || skin?.skin_name || "Unknown Skin"
+                  const weaponName = skin?.weapon?.name || (skinName.includes("|") ? skinName.split("|")[0].trim() : "WEAPON")
+
+                  return (
+                    <div key={i} className={`flex-shrink-0 w-[140px] h-40 bg-[#0a0f1c] border-2 rounded-sm p-3 flex flex-col items-center justify-between ${skin ? getRarityColor(rarityName) : 'border-gray-700'}`}>
+                      {skin ? (
+                        <>
+                          <img src={skinImage} alt={skinName} className="w-full h-24 object-contain drop-shadow-xl" />
+                          <div className="text-center w-full bg-black/40 p-1.5 rounded-sm border-t border-white/5">
+                            <div className="text-[9px] text-zinc-500 uppercase tracking-widest truncate">{weaponName}</div>
+                            <div className="text-[11px] font-bold text-white truncate w-full">{skinName}</div>
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </motion.div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="w-full relative py-12 overflow-hidden bg-[#050811] border border-white/10 rounded-md shadow-2xl">
-            <div className="flex flex-col items-center justify-center h-40 gap-6">
-                <div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-sm border border-white/10">
-                {[1, 3, 5].map(q => (
-                    <button key={q} onClick={() => setQuantity(q)} className={`px-6 py-2 text-sm font-bold rounded-sm transition-colors ${quantity === q ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}>{q}x AÇ</button>
-                ))}
-                </div>
-                <button onClick={openCase} className="group relative bg-red-600/10 border border-red-500/30 p-2 rounded-md hover:bg-red-600/20 hover:scale-105 transition-all flex items-center gap-6 px-12 py-5 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
-                {selectedCrate && <img src={selectedCrate.image} alt={selectedCrate.name} className="w-16 h-16 group-hover:animate-bounce" />}
-                <div className="flex flex-col items-start">
-                    <span className="text-xl font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${((selectedCrate?.isCustom ? selectedCrate.customPrice : CASE_PRICE) * quantity).toFixed(2)})</span></span>
-                    <span className="text-xs text-zinc-400 uppercase tracking-wider">{selectedCrate?.name} (x{quantity})</span>
-                </div>
-                </button>
+          <div className="flex flex-col items-center justify-center h-40 gap-6">
+            <div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-sm border border-white/10">
+              {[1, 3, 5].map(q => (
+                <button key={q} onClick={() => setQuantity(q)} className={`px-6 py-2 text-sm font-bold rounded-sm transition-colors ${quantity === q ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}>{q}x AÇ</button>
+              ))}
             </div>
+            <button onClick={openCase} className="group relative bg-red-600/10 border border-red-500/30 p-2 rounded-md hover:bg-red-600/20 hover:scale-105 transition-all flex items-center gap-6 px-12 py-5 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
+              {selectedCrate && <img src={selectedCrate.image} alt={selectedCrate.name} className="w-16 h-16 group-hover:animate-bounce" />}
+              <div className="flex flex-col items-start">
+                <span className="text-xl font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${((selectedCrate?.isCustom ? selectedCrate.customPrice : CASE_PRICE) * quantity).toFixed(2)})</span></span>
+                <span className="text-xs text-zinc-400 uppercase tracking-wider">{selectedCrate?.name} (x{quantity})</span>
+              </div>
+            </button>
+          </div>
         </div>
       )}
 
