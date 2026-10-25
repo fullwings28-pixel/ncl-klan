@@ -1,10 +1,8 @@
 "use client"
 import { useEffect, useState, useRef } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabaseClient"
 import { Send, Search, MessageSquare, Terminal, ChevronLeft } from "lucide-react"
 import { useSearchParams } from "next/navigation"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 export default function DMClient({ currentUser }: { currentUser: any }) {
   const searchParams = useSearchParams()
@@ -88,7 +86,6 @@ export default function DMClient({ currentUser }: { currentUser: any }) {
   return (
     <div className="flex-1 flex overflow-hidden max-w-[1400px] w-full mx-auto relative z-10 p-2 sm:p-4 gap-2 sm:gap-4 h-[calc(100vh-72px)]">
       
-      {/* SOL MENÜ */}
       <div className={`w-full md:w-64 bg-[#0a0f1c]/80 border border-white/5 rounded-md flex-col backdrop-blur-xl ${activeUser ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-4 border-b border-white/5">
           <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-3 flex items-center gap-2"><Terminal size={12}/> GÜVENLİ HATLAR</h2>
@@ -123,12 +120,10 @@ export default function DMClient({ currentUser }: { currentUser: any }) {
         </div>
       </div>
 
-      {/* SAĞ TARAF */}
       <div className={`flex-1 flex-col bg-[#0a0f1c]/60 border border-white/5 rounded-md relative backdrop-blur-xl ${activeUser ? 'flex' : 'hidden md:flex'}`}>
         {activeUser ? (
           <>
             <div className="h-14 border-b border-white/5 flex items-center px-4 gap-3 bg-black/40">
-              {/* Mobil Geri Butonu */}
               <button onClick={() => setActiveUser(null)} className="md:hidden p-1.5 -ml-2 text-zinc-400 hover:text-white">
                 <ChevronLeft size={20} />
               </button>

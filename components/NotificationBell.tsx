@@ -2,9 +2,7 @@
 import { useEffect, useState, useRef } from "react"
 import { Bell } from "lucide-react"
 import Link from "next/link"
-import { createClient } from "@supabase/supabase-js"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+import { supabase } from "@/lib/supabaseClient"
 
 export default function NotificationBell({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<any[]>([])
@@ -22,14 +20,12 @@ export default function NotificationBell({ userId }: { userId: string }) {
   useEffect(() => {
     fetchNotifications()
 
-    // Canlı dinleme (Yeni bildirim gelirse anında zil yansın)
     const channel = supabase.channel('realtime-notifications')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => {
         fetchNotifications()
       })
       .subscribe()
 
-    // Dışına tıklayınca menüyü kapat
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setIsOpen(false)
     }

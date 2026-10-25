@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
 import UserProfileModal from "@/components/UserProfileModal"
@@ -10,12 +10,7 @@ import ContextMenu from "@/components/ContextMenu"
 import { Send, ShieldAlert, Hash, Users, Flag, Terminal } from "lucide-react"
 import { useToast } from "@/components/Toast"
 import ConfirmModal from "@/components/ConfirmModal"
-import { usePresence } from "@/hooks/usePresence" // <-- YENİ
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { usePresence } from "@/hooks/usePresence"
 
 type Message = {
   id: number
@@ -45,7 +40,6 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
 
-  // ÇEVRİMİÇİ KULLANICILARI ÇEK
   const onlineUsers = usePresence(currentUser)
 
   const fetchReactions = async () => {

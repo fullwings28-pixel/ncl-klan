@@ -2,12 +2,10 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchCrates, Crate, Skin } from "@/lib/csgo-api"
-import { createClient } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabaseClient"
 import { Gift, Sparkles, X, Package } from "lucide-react"
 import CustomAlert from "@/components/CustomAlert"
 import { CASE_PRICE } from "@/lib/economy"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 export default function CaseClient({ currentUser }: { currentUser: any }) {
   const [balance, setBalance] = useState(currentUser.balance || 0)
@@ -53,19 +51,15 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     document.addEventListener('touchstart', unlockAudio)
 
     const fetchAllCases = async () => {
-      // 1. Standart CS2 Kasalarını Çek
       const apiCrates = await fetchCrates()
-      
-      // 2. Özel Kasaları Çek
       const { data: customData } = await supabase.from("custom_cases").select("*")
-      
       const formattedCustom = (customData || []).map(c => ({
         id: c.id,
         name: c.name,
         image: c.image_url,
         isCustom: true,
         customPrice: Number(c.price),
-        contains: [] // UI'da içerik göstermek gerekirse doldurulabilir
+        contains: []
       }))
 
       const allCrates = [...formattedCustom, ...apiCrates]
@@ -122,13 +116,10 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
 
       const newReels = [];
       for (let q = 0; q < quantity; q++) {
-        // Özel kasa ise ve içerik API'den gelmediyse geçici bir havuz oluştur
         const pool = selectedCrate.isCustom ? [data.skins[q]] : (selectedCrate.contains || [])
         
         const reelItems = Array.from({ length: 60 }).map(() => {
           if (selectedCrate.isCustom) {
-             // Özel kasalarda şeritte rastgele skinler göstermek zor olduğu için
-             // şeridi kazanılan skinin etrafında dönecek şekilde ayarlıyoruz
              const tempPool = [data.skins[q], ...(selectedCrate.contains || [])];
              return tempPool[Math.floor(Math.random() * tempPool.length)] || data.skins[q];
           }
@@ -223,7 +214,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
             <button key={crate.id} onClick={() => !isOpening && setSelectedCrate(crate)}
               className={`flex-shrink-0 w-32 p-3 rounded-sm border transition-all duration-300 relative ${selectedCrate?.id === crate.id ? "border-red-500/50 bg-red-500/10 shadow-[inset_0_0_20px_rgba(239,68,68,0.1)]" : "border-white/5 bg-[#0a0f1c]/50 hover:border-white/20 hover:bg-white/5"} ${isOpening ? 'opacity-50 cursor-not-allowed' : ''}`}>
               
-              {/* Özel Kasa Etiketi */}
               {crate.isCustom && (
                 <div className="absolute -top-2 -right-2 bg-purple-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-sm border border-purple-400 z-10">ÖZEL</div>
               )}

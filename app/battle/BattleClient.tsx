@@ -1,11 +1,9 @@
 "use client"
 import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
-import { Swords, Bot, User, Plus, Coins, Trophy, X } from "lucide-react"
+import { supabase } from "@/lib/supabaseClient"
+import { Swords, Bot, User, Plus, Trophy, X } from "lucide-react"
 import { fetchCrates, Crate } from "@/lib/csgo-api"
 import { useToast } from "@/components/Toast"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 export default function BattleClient({ currentUser }: { currentUser: any }) {
   const [battles, setBattles] = useState<any[]>([])
@@ -13,13 +11,11 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   
-  // Form state
   const [selectedCase, setSelectedCase] = useState("")
   const [wager, setWager] = useState("100")
   const [rounds, setRounds] = useState("3")
   const [opponentType, setOpponentType] = useState<"bot" | "player">("bot")
 
-  // Aktif Savaş İzleme State
   const [activeBattle, setActiveBattle] = useState<any>(null)
   const [battleItems, setBattleItems] = useState<any[]>([])
   const { showToast } = useToast()
@@ -33,19 +29,8 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
   }
 
   useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        const loadedCrates = await fetchCrates()
-        setCrates(loadedCrates)
-        await fetchBattles()
-      } catch (error) {
-        console.error("Veri yüklenirken hata:", error)
-      } finally {
-        setLoading(false) // <-- BURADAKİ EKSİK BİZİ KURTARACAK
-      }
-    }
-
-    loadInitialData()
+    fetchCrates().then(setCrates)
+    fetchBattles()
     
     const channel = supabase.channel("battle-lobby")
       .on("postgres_changes", { event: "*", schema: "public", table: "battles" }, () => fetchBattles())
@@ -54,7 +39,6 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Eğer bir savaş açıksa onu canlı izle
   useEffect(() => {
     if (!activeBattle) return
 
@@ -67,7 +51,7 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
     }
 
     fetchBattleData()
-    const interval = setInterval(fetchBattleData, 1500) // 1.5 saniyede bir güncelle
+    const interval = setInterval(fetchBattleData, 1000) 
     return () => clearInterval(interval)
   }, [activeBattle?.id])
 
@@ -86,7 +70,6 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
     if (res.ok) {
       setShowCreate(false)
       showToast("Savaş başlatıldı!", "success")
-      
       const { data: b } = await supabase.from("battles").select("*, battle_players(*, profiles(display_name, avatar_url))").eq("id", data.battle_id).single()
       if (b) setActiveBattle(b)
     } else {
@@ -112,10 +95,9 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
 
   if (loading) return <div className="text-center py-20 text-zinc-500 uppercase tracking-widest text-sm animate-pulse">Savaş Alanı Yükleniyor...</div>
 
-  // AKTİF SAVAŞ EKRANI
   if (activeBattle) {
     const p1 = activeBattle.battle_players.find((p: any) => !p.is_bot)
-    const p2 = activeBattle.battle_players.find((p: any) => p.is_bot) // Şimdilik hep 2 kişi üzerinden
+    const p2 = activeBattle.battle_players.find((p: any) => p.is_bot) 
     const isFinished = activeBattle.status === "finished"
     const winnerName = activeBattle.winner_id === p1?.user_id ? p1?.profiles?.display_name : p2?.bot_name
 
@@ -131,7 +113,6 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
         </div>
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
-          {/* SOL OYUNCU */}
           <div className="flex flex-col items-center flex-1">
             <div className="relative mb-4">
               {!p1?.is_bot ? <img src={p1?.profiles?.avatar_url} className="w-24 h-24 rounded-sm border-2 border-cyan-500" /> : <img src={p1?.bot_avatar} className="w-24 h-24 rounded-sm border-2 border-cyan-500 bg-zinc-800" />}
@@ -144,7 +125,6 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
 
           <div className="text-4xl font-black italic text-red-500 tracking-tighter">VS</div>
 
-          {/* SAĞ OYUNCU */}
           <div className="flex flex-col items-center flex-1">
             <div className="relative mb-4">
               {!p2?.is_bot ? <img src={p2?.profiles?.avatar_url} className="w-24 h-24 rounded-sm border-2 border-red-500" /> : <img src={p2?.bot_avatar} className="w-24 h-24 rounded-sm border-2 border-red-500 bg-zinc-800" />}
@@ -156,7 +136,6 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
           </div>
         </div>
 
-        {/* DROPLAR */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Array.from({ length: activeBattle.rounds }).map((_, i) => {
             const r = i + 1;
@@ -189,7 +168,6 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
     )
   }
 
-  // LOBİ EKRANI
   return (
     <div>
       {showCreate && (

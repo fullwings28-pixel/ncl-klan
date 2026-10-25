@@ -1,13 +1,11 @@
 "use client"
 import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabaseClient"
 import { fetchSkins, Skin } from "@/lib/csgo-api"
 import { getWear, getFloatMultiplier, getSkinMultiplier, RARITY_BASE_PRICES } from "@/lib/economy"
 import { ArrowUpRight, RefreshCw, X, Package } from "lucide-react"
 import { useToast } from "@/components/Toast"
 import { motion, AnimatePresence } from "framer-motion"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 export default function UpgradeClient({ currentUser }: { currentUser: any }) {
   const [inventory, setInventory] = useState<any[]>([])
@@ -20,7 +18,6 @@ export default function UpgradeClient({ currentUser }: { currentUser: any }) {
   const [skinsPool, setSkinsPool] = useState<Skin[]>([])
   const { showToast } = useToast()
 
-  // Envanteri ve Hedef Skinleri Çek
   useEffect(() => {
     const fetchData = async () => {
       const { data: invData } = await supabase.from("inventories").select("*").eq("user_id", currentUser.id).order("price", { ascending: false })
@@ -34,7 +31,6 @@ export default function UpgradeClient({ currentUser }: { currentUser: any }) {
     fetchData()
   }, [currentUser.id])
 
-  // Rastgele bir hedef skin seç
   const rollTargetSkin = () => {
     if (!selectedSource) return showToast("Önce yükseltmek için bir eşya seç.", "error")
     
@@ -56,7 +52,6 @@ export default function UpgradeClient({ currentUser }: { currentUser: any }) {
     const floatVal = Number((Math.random()).toFixed(8))
     const wear = getWear(floatVal)
     const basePrice = RARITY_BASE_PRICES[randomSkin.rarity.name] || 1
-    
     const finalPrice = Number((basePrice * getFloatMultiplier(floatVal) * getSkinMultiplier(randomSkin.name)).toFixed(2))
 
     setTargetItem({ ...randomSkin, float: floatVal, wear, price: finalPrice })
@@ -122,7 +117,6 @@ export default function UpgradeClient({ currentUser }: { currentUser: any }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center bg-[#0a0f1c] p-8 rounded-xl border border-white/5 shadow-2xl relative">
         
-        {/* SOL TARAF: KAYNAK EŞYA SEÇİMİ */}
         <div className="flex flex-col gap-4">
           <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] text-center">Yükseltilecek Eşya</h2>
           
@@ -153,7 +147,6 @@ export default function UpgradeClient({ currentUser }: { currentUser: any }) {
           </div>
         </div>
 
-        {/* ORTA TARAF */}
         <div className="flex flex-col items-center justify-center relative">
           <div className="relative w-40 h-40 rounded-full border-4 border-white/5 flex items-center justify-center mb-6 bg-black/50">
             {isUpgrading ? (
@@ -186,7 +179,6 @@ export default function UpgradeClient({ currentUser }: { currentUser: any }) {
           </button>
         </div>
 
-        {/* SAĞ TARAF: HEDEF EŞYA */}
         <div className="flex flex-col gap-4">
           <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] text-center">Hedef Eşya</h2>
           

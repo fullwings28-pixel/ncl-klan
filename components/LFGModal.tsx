@@ -1,9 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
-import { X, Users, Plus, Trash2, ShieldAlert, Crosshair } from "lucide-react"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+import { supabase } from "@/lib/supabaseClient"
+import { X, Users, Plus, Trash2, ShieldAlert } from "lucide-react"
 
 export default function LFGModal({ currentUser, onClose }: { currentUser: any, onClose: () => void }) {
   const [posts, setPosts] = useState<any[]>([])
