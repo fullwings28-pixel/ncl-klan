@@ -22,25 +22,34 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   const cratesContainerRef = useRef<HTMLDivElement>(null)
   const winningSkinRef = useRef<Skin | null>(null)
   
-  // KASA AÇMA SESİ İÇİN REF
-  const openAudioRef = useRef<HTMLAudioElement | null>(null)
+  // SES İÇİN REF'LER
+  const tickAudioRef = useRef<HTMLAudioElement | null>(null)
+  const tickTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false)
 
   const [alertState, setAlertState] = useState({ isOpen: false, message: "", type: "info" as "info" | "error" | "success" })
   const showAlert = (message: string, type: "info" | "error" | "success" = "info") => setAlertState({ isOpen: true, message, type })
 
   useEffect(() => {
-    // Kasa açılma/kayma sesi (Tıkırtı/Whoosh efekti)
-    openAudioRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2005/2005-preview.mp3")
-    openAudioRef.current.volume = 0.6
+    // Kasa tıkırtı sesi
+    tickAudioRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3")
+    tickAudioRef.current.volume = 0.4
     
-    // Ses engelini aş
-    const unlock = () => {
-      if(openAudioRef.current) {
-        openAudioRef.current.play().then(() => openAudioRef.current!.pause()).catch(()=>{})
+    // Tarayıcı ses engelini aşmak için ilk tıklamayı bekle
+    const unlockAudio = () => {
+      if (!isAudioUnlocked && tickAudioRef.current) {
+        tickAudioRef.current.play().then(() => {
+          tickAudioRef.current!.pause()
+          tickAudioRef.current!.currentTime = 0
+          setIsAudioUnlocked(true)
+        }).catch(() => {})
       }
-      document.removeEventListener('click', unlock)
+      document.removeEventListener('click', unlockAudio)
+      document.removeEventListener('touchstart', unlockAudio)
     }
-    document.addEventListener('click', unlock)
+
+    document.addEventListener('click', unlockAudio)
+    document.addEventListener('touchstart', unlockAudio)
 
     fetchCrates().then(data => {
       setCrates(data)
@@ -48,8 +57,37 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       setLoading(false)
     }).catch(err => setLoading(false))
 
-    return () => document.removeEventListener('click', unlock)
-  }, [])
+    return () => {
+      document.removeEventListener('click', unlockAudio)
+      if (tickTimerRef.current) clearTimeout(tickTimerRef.current)
+    }
+  }, [isAudioUnlocked])
+
+  // TIK TIK TIK SES ALGORİTMASI
+  const playTickSequence = (durationMs: number) => {
+    let elapsed = 0;
+    let delay = 40; // Başlangıçta çok hızlı (40ms'de bir)
+
+    const tick = () => {
+      if (elapsed >= durationMs) return;
+      
+      if (tickAudioRef.current) {
+        tickAudioRef.current.currentTime = 0;
+        tickAudioRef.current.play().catch(() => {});
+      }
+      
+      elapsed += delay;
+      
+      // Animasyon yavaşladıkça sesin de yavaşlamasını sağlayan matematiksel formül
+      // (Zaman geçtikçe delay artar)
+      const progress = elapsed / durationMs; 
+      delay = 40 + (progress * progress) * 350; // Sonlara doğru 350ms'ye kadar yavaşlar
+
+      tickTimerRef.current = setTimeout(tick, delay);
+    };
+    
+    tick();
+  }
 
   const claimDaily = async () => {
     setIsClaiming(true)
@@ -66,11 +104,8 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     if (!selectedCrate || balance < 100) return showAlert("Yetersiz bakiye! Günlük ödülünü al.", "error")
     setIsOpening(true); setWonSkin(null); setAnimationTarget(0)
 
-    // SESİ ÇAL
-    if (openAudioRef.current) {
-      openAudioRef.current.currentTime = 0;
-      openAudioRef.current.play().catch(() => {});
-    }
+    // Tıkırtı sesini başlat (4.5 saniye sürecek)
+    playTickSequence(4500);
 
     try {
       const res = await fetch("/api/case/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crateId: selectedCrate.id }) })
@@ -105,12 +140,14 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     } catch (error) {
       showAlert("Sunucuya bağlanılamadı.", "error")
       setIsOpening(false)
+      if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
     }
   }
 
   const handleAnimationComplete = () => {
     if (isOpening && animationTarget !== 0) {
       setIsOpening(false)
+      if (tickTimerRef.current) clearTimeout(tickTimerRef.current); // Ses döngüsünü durdur
       if (winningSkinRef.current) setWonSkin(winningSkinRef.current) 
     }
   }
