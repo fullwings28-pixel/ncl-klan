@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
-import { Coins, Package, ArrowRight, DollarSign, Trash2 } from "lucide-react"
+import { Coins, Package, ArrowRight, DollarSign, Trash2, Lock, Unlock } from "lucide-react"
 import { useToast } from "@/components/Toast"
 import ConfirmModal from "@/components/ConfirmModal"
 
@@ -22,8 +22,35 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
 
   useEffect(() => { fetchItems() }, [])
 
-  const handleSellClick = (item: any) => setConfirmState({ isOpen: true, item, type: "single" })
-  const handleSellAllClick = () => setConfirmState({ isOpen: true, item: null, type: "all" })
+  // Kilit açma/kapatma
+  const handleToggleLock = async (item: any) => {
+    const newLockState = !item.is_locked
+    // UI'ı anında güncelle (Optimistic UI)
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_locked: newLockState } : i))
+
+    const res = await fetch("/api/inventory/toggle-lock", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inventoryId: item.id, isLocked: newLockState })
+    })
+
+    if (res.ok) {
+      showToast(newLockState ? "Eşya kilitlendi." : "Eşyanın kilidi açıldı.", "success")
+    } else {
+      showToast("Kilit durumu değiştirilemedi.", "error")
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_locked: item.is_locked } : i)) // Hata olursa geri al
+    }
+  }
+
+  const handleSellClick = (item: any) => {
+    if (item.is_locked) return showToast("Kilitli eşyalar satılamaz.", "error")
+    setConfirmState({ isOpen: true, item, type: "single" })
+  }
+  
+  const handleSellAllClick = () => {
+    const unlockedItems = items.filter(i => !i.is_locked)
+    if (unlockedItems.length === 0) return showToast("Satılacak kilitli olmayan eşya yok.", "error")
+    setConfirmState({ isOpen: true, item: null, type: "all" })
+  }
 
   const confirmSell = async () => {
     if (confirmState.type === "single") {
@@ -46,8 +73,9 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
 
       if (res.ok) {
         setBalance(data.newBalance)
-        setItems([])
-        showToast(`Tüm envanter satıldı! +$${Number(data.totalPrice).toFixed(2)}`, "success")
+        // Sadece kilitli olmayanları uçur
+        setItems(prev => prev.filter(item => item.is_locked)) 
+        showToast(`Tüm satılabilir eşyalar satıldı! +$${Number(data.totalPrice).toFixed(2)}`, "success")
       } else {
         showToast(data.error || "Satış başarısız.", "error")
       }
@@ -57,7 +85,8 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
     setConfirmState({ isOpen: false, item: null, type: "single" })
   }
 
-  const getRarityStyle = (rarity: string) => {
+  const getRarityStyle = (rarity: string, isLocked: boolean) => {
+    if (isLocked) return "border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)] bg-yellow-500/5" // Kilitliyse altın sarısı parlama
     switch (rarity) {
       case "Rare Special": return "border-yellow-500/50 shadow-[0_0_15px_rgba(250,204,21,0.15)] bg-yellow-500/5"
       case "Covert": return "border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.15)] bg-red-500/5"
@@ -68,7 +97,9 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
     }
   }
 
-  const totalValue = items.reduce((acc, item) => acc + Number(item.price), 0)
+  // Sadece kilitli olmayanların toplamını hesapla
+  const totalValue = items.filter(i => !i.is_locked).reduce((acc, item) => acc + Number(item.price), 0)
+  const unlockedCount = items.filter(i => !i.is_locked).length
 
   if (loading) return <div className="text-zinc-400 text-center py-20 text-sm uppercase tracking-widest animate-pulse">Cephanelik Yükleniyor...</div>
 
@@ -79,7 +110,7 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
         title={confirmState.type === "all" ? "Tüm Envanteri Sat" : "Eşyayı Sat"}
         message={
           confirmState.type === "all" 
-            ? `Tüm envanterindeki ${items.length} eşyayı toplam $${totalValue.toFixed(2)} karşılığında satmak istediğine emin misin?`
+            ? `Envanterindeki kilitli OLMAYAN ${unlockedCount} eşyayı toplam $${totalValue.toFixed(2)} karşılığında satmak istediğine emin misin? (Kilitli eşyalar korunacak)`
             : confirmState.item ? `"${confirmState.item.skin_name}" eşyasını $${Number(confirmState.item.price).toFixed(2)} karşılığında satmak istediğine emin misin?` : ""
         }
         onConfirm={confirmSell}
@@ -91,11 +122,11 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
           <h1 className="text-3xl font-black text-white flex items-center gap-3 tracking-widest uppercase">
             <Package className="text-red-500" size={28}/> Cephanelik
           </h1>
-          <p className="text-zinc-400 text-xs mt-1 tracking-wider uppercase">Kasalardan çıkan eşyaların burada.</p>
+          <p className="text-zinc-400 text-xs mt-1 tracking-wider uppercase">Eşyalarını kilitleyerek güvende tut.</p>
         </div>
         
         <div className="flex items-center gap-4">
-          {items.length > 0 && (
+          {unlockedCount > 0 && (
             <button 
               onClick={handleSellAllClick} 
               disabled={isSellingAll}
@@ -126,16 +157,37 @@ export default function InventoryClient({ currentUser }: { currentUser: any }) {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-4 w-full">
           {items.map((item) => (
-            <div key={item.id} className={`rounded-md border p-3 flex flex-col items-center relative group transition-all duration-300 hover:-translate-y-1 ${getRarityStyle(item.skin_rarity)}`}>
-              <img src={item.skin_image} alt={item.skin_name} className="w-full h-16 object-contain mb-2 drop-shadow-2xl group-hover:scale-110 transition-transform duration-300" />
+            <div key={item.id} className={`rounded-md border p-3 flex flex-col items-center relative group transition-all duration-300 hover:-translate-y-1 ${getRarityStyle(item.skin_rarity, item.is_locked)}`}>
+              
+              {/* KİLİT BUTONU (Sağ Üst Köşe) */}
+              <button 
+                onClick={() => handleToggleLock(item)}
+                className={`absolute top-2 right-2 p-1.5 rounded-md backdrop-blur-md transition-all z-10 ${item.is_locked ? 'bg-yellow-500 text-black shadow-[0_0_10px_rgba(234,179,8,0.5)]' : 'bg-black/50 text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-white'}`}
+                title={item.is_locked ? "Kilidi Aç" : "Kilitle"}
+              >
+                {item.is_locked ? <Lock size={14} /> : <Unlock size={14} />}
+              </button>
+
+              <img src={item.skin_image} alt={item.skin_name} className={`w-full h-16 object-contain mb-2 drop-shadow-2xl transition-transform duration-300 ${item.is_locked ? 'opacity-80' : 'group-hover:scale-110'}`} />
+              
               <div className="text-center w-full mb-2">
                 <div className="text-[8px] text-zinc-500 uppercase tracking-widest mb-0.5">{item.skin_rarity}</div>
                 <div className="text-[11px] font-bold text-white truncate w-full tracking-wide" title={item.skin_name}>{item.skin_name}</div>
                 {item.wear && <div className="text-[9px] text-zinc-400 mt-0.5">{item.wear}</div>}
                 {item.float_value && <div className="text-[8px] text-zinc-600 font-mono">F: {Number(item.float_value).toFixed(5)}</div>}
               </div>
-              <button onClick={() => handleSellClick(item)} className="w-full bg-black/40 hover:bg-green-600/20 text-zinc-400 hover:text-green-400 py-1.5 rounded-sm text-[10px] font-bold transition-all flex items-center justify-center gap-1 border border-white/5 hover:border-green-500/30 uppercase tracking-widest">
-                <Coins size={12} /> ${Number(item.price).toFixed(2)} SAT
+
+              {/* SAT BUTONU (Kilitliyse devre dışı veya farklı görünür) */}
+              <button 
+                onClick={() => handleSellClick(item)} 
+                disabled={item.is_locked}
+                className={`w-full py-1.5 rounded-sm text-[10px] font-bold transition-all flex items-center justify-center gap-1 border uppercase tracking-widest ${
+                  item.is_locked 
+                    ? 'bg-yellow-500/10 text-yellow-500/50 border-yellow-500/10 cursor-not-allowed' 
+                    : 'bg-black/40 hover:bg-green-600/20 text-zinc-400 hover:text-green-400 border-white/5 hover:border-green-500/30'
+                }`}
+              >
+                {item.is_locked ? <><Lock size={10} /> KİLİTLİ</> : <><Coins size={12} /> ${Number(item.price).toFixed(2)} SAT</>}
               </button>
             </div>
           ))}

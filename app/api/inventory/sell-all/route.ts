@@ -8,14 +8,15 @@ export async function POST() {
 
   const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
 
-  // 1. Kullanıcının envanterini çek
+  // 1. Kullanıcının SADECE KİLİTLİ OLMAYAN envanterini çek
   const { data: items, error } = await supabase
     .from("inventories")
     .select("id, price")
     .eq("user_id", session.id)
+    .eq("is_locked", false) // KİLİTLİLERİ HARİÇ TUT
 
   if (error) return NextResponse.json({ error: "Envanter çekilemedi." }, { status: 500 })
-  if (!items || items.length === 0) return NextResponse.json({ error: "Envanter zaten boş." }, { status: 400 })
+  if (!items || items.length === 0) return NextResponse.json({ error: "Satılacak (kilitli olmayan) eşya bulunamadı." }, { status: 400 })
 
   // 2. Toplam fiyatı hesapla
   const totalPrice = items.reduce((acc, item) => acc + Number(item.price), 0)
@@ -26,8 +27,9 @@ export async function POST() {
 
   await supabase.from("profiles").update({ balance: newBalance }).eq("id", session.id)
 
-  // 4. Envanteri temizle
-  await supabase.from("inventories").delete().eq("user_id", session.id)
+  // 4. Sadece satılan (kilitli olmayan) eşyaları sil
+  const itemIds = items.map(i => i.id)
+  await supabase.from("inventories").delete().in("id", itemIds)
 
   return NextResponse.json({ success: true, newBalance, totalPrice })
 }
