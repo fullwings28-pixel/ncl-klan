@@ -19,10 +19,10 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   // Multi-reel state
   const [reels, setReels] = useState<{ id: number, items: Skin[], target: string, duration: number }[]>([])
   const [reelKey, setReelKey] = useState(0)
-  const [completedReels, setCompletedReels] = useState(0)
   
   const resultRef = useRef<any[] | null>(null) 
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
+  const finishTimerRef = useRef<NodeJS.Timeout | null>(null)
   
   const tickAudioRef = useRef<HTMLAudioElement | null>(null)
   const tickTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -55,6 +55,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     return () => {
       document.removeEventListener('click', unlockAudio)
       if (tickTimerRef.current) clearTimeout(tickTimerRef.current)
+      if (finishTimerRef.current) clearTimeout(finishTimerRef.current)
     }
   }, [isAudioUnlocked])
 
@@ -88,11 +89,11 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     
     setIsOpening(true); 
     setWonSkins(null); 
-    setCompletedReels(0);
-    setReels([]);
+    setReels([]); // Önceki şeritleri temizle
     
-    const durations = [3.5, 4.0, 4.5, 5.0, 5.5];
-    const maxDuration = durations[quantity - 1] || 5.5;
+    // Animasyon süreleri (her sıra biraz daha geç biter)
+    const durations = [4.5, 4.8, 5.1, 5.4, 5.7];
+    const maxDuration = durations[quantity - 1] || 5.7;
     
     playTickSequence(maxDuration * 1000);
 
@@ -107,6 +108,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       
       resultRef.current = data.skins;
 
+      // Her kasa için ayrı bir şerit oluştur
       const newReels = [];
       for (let q = 0; q < quantity; q++) {
         const pool = selectedCrate.contains || [];
@@ -119,20 +121,22 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         newReels.push({
             id: q,
             items: reelItems,
-            duration: durations[q] || 5.5,
-            target: "0px"
+            duration: durations[q] || 5.7,
+            target: "0px" // Başlangıçta hedef 0
         });
       }
       
       setReels(newReels); 
       setBalance(data.newBalance)
 
+      // Hedef konumları hesapla ve animasyonu başlat
       setTimeout(() => {
         const targets = rowRefs.current.map(ref => {
             if (!ref) return "0px";
             const containerCenter = ref.offsetWidth / 2;
             const winningIndex = 55;
-            const ITEM_WIDTH = 120; const GAP = 12; 
+            const ITEM_WIDTH = 140; // Genişlik büyütüldü
+            const GAP = 12; 
             const totalItemWidth = ITEM_WIDTH + GAP;
             const itemCenterX = (winningIndex * totalItemWidth) + (ITEM_WIDTH / 2);
             const randomOffset = (Math.random() - 0.5) * (ITEM_WIDTH - 40); 
@@ -140,28 +144,24 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         });
 
         setReels(prev => prev.map((reel, i) => ({ ...reel, target: targets[i] || "0px" })));
-        setReelKey(prev => prev + 1);
-      }, 50)
+        setReelKey(prev => prev + 1); // Animasyonu tetikle
+      }, 100)
+
+      // KESİN ZAMANLAYICI: Animasyon bittiğinde sonuçları göster
+      if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
+      finishTimerRef.current = setTimeout(() => {
+        setIsOpening(false);
+        if (resultRef.current) {
+          setWonSkins(resultRef.current);
+        }
+        if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
+      }, (maxDuration * 1000) + 200); // Animasyon süresinden 200ms sonra aç
 
     } catch (error) {
       showAlert("Sunucuya bağlanılamadı.", "error")
       setIsOpening(false)
       if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
     }
-  }
-
-  const handleRowAnimationComplete = () => {
-    setCompletedReels(prev => {
-        const next = prev + 1;
-        if (next === quantity) {
-            setIsOpening(false);
-            if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
-            if (resultRef.current) {
-                setWonSkins(resultRef.current);
-            }
-        }
-        return next;
-    });
   }
 
   const getRarityColor = (rarityName: string) => {
@@ -212,12 +212,11 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       </div>
 
       {isOpening ? (
-        <div className="flex flex-col gap-2 w-full">
+        <div className="flex flex-col gap-3 w-full">
             {reels.map((reel, index) => (
-                <div key={index} className="w-full relative overflow-hidden bg-[#050811] border border-white/10 rounded-md py-2">
-                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
-                    <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-                    <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                <div key={index} className="w-full relative overflow-hidden bg-[#050811] border border-white/10 rounded-md py-4">
+                    {/* Kırmızı İbre */}
+                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
                     
                     <motion.div 
                         key={`${reelKey}-${index}`} 
@@ -225,15 +224,15 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
                         initial={{ x: 0 }} 
                         animate={{ x: reel.target }} 
                         transition={{ duration: reel.duration, ease: [0.1, 0.9, 0.2, 1] }} 
-                        onAnimationComplete={handleRowAnimationComplete}
-                        ref={(el) => { rowRefs.current[index] = el }} // HATA BURADAYDI, DÜZELTİLDİ
+                        // Framer Motion'ın hatalı bitişini iptal ettik, zamanlayıcı kullanıyoruz
+                        ref={(el) => { rowRefs.current[index] = el }}
                     >
                         {reel.items.map((skin, i) => (
-                            <div key={i} className={`flex-shrink-0 w-[120px] h-32 bg-[#0a0f1c] border-2 rounded-sm p-2 flex flex-col items-center justify-between ${getRarityColor(skin.rarity.name)}`}>
-                                <img src={skin.image} alt={skin.name} className="w-full h-16 object-contain drop-shadow-xl" />
-                                <div className="text-center w-full bg-black/40 p-1 rounded-sm border-t border-white/5">
-                                    <div className="text-[8px] text-zinc-500 uppercase tracking-widest">{skin.weapon?.name}</div>
-                                    <div className="text-[10px] font-bold text-white truncate w-full">{skin.name}</div>
+                            <div key={i} className={`flex-shrink-0 w-[140px] h-40 bg-[#0a0f1c] border-2 rounded-sm p-3 flex flex-col items-center justify-between ${getRarityColor(skin.rarity.name)}`}>
+                                <img src={skin.image} alt={skin.name} className="w-full h-24 object-contain drop-shadow-xl" />
+                                <div className="text-center w-full bg-black/40 p-1.5 rounded-sm border-t border-white/5">
+                                    <div className="text-[9px] text-zinc-500 uppercase tracking-widest">{skin.weapon?.name}</div>
+                                    <div className="text-[11px] font-bold text-white truncate w-full">{skin.name}</div>
                                 </div>
                             </div>
                         ))}
@@ -243,20 +242,20 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         </div>
       ) : (
         <div className="w-full relative py-12 overflow-hidden bg-[#050811] border border-white/10 rounded-md shadow-2xl">
-            <div className="flex flex-col items-center justify-center h-36 gap-4">
-                <div className="flex items-center gap-2 bg-black/40 p-1 rounded-sm border border-white/10">
+            <div className="flex flex-col items-center justify-center h-40 gap-6">
+                <div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-sm border border-white/10">
                 {[1, 3, 5].map(q => (
-                    <button key={q} onClick={() => setQuantity(q)} className={`px-4 py-1.5 text-xs font-bold rounded-sm transition-colors ${quantity === q ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}>
+                    <button key={q} onClick={() => setQuantity(q)} className={`px-6 py-2 text-sm font-bold rounded-sm transition-colors ${quantity === q ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}>
                     {q}x AÇ
                     </button>
                 ))}
                 </div>
 
-                <button onClick={openCase} className="group relative bg-red-600/10 border border-red-500/30 p-1 rounded-md hover:bg-red-600/20 hover:scale-105 transition-all flex items-center gap-5 px-10 py-4 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
-                {selectedCrate && <img src={selectedCrate.image} alt={selectedCrate.name} className="w-14 h-14 group-hover:animate-bounce" />}
+                <button onClick={openCase} className="group relative bg-red-600/10 border border-red-500/30 p-2 rounded-md hover:bg-red-600/20 hover:scale-105 transition-all flex items-center gap-6 px-12 py-5 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
+                {selectedCrate && <img src={selectedCrate.image} alt={selectedCrate.name} className="w-16 h-16 group-hover:animate-bounce" />}
                 <div className="flex flex-col items-start">
-                    <span className="text-lg font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${(CASE_PRICE * quantity).toFixed(2)})</span></span>
-                    <span className="text-[10px] text-zinc-400 uppercase tracking-wider">{selectedCrate?.name} (x{quantity})</span>
+                    <span className="text-xl font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${(CASE_PRICE * quantity).toFixed(2)})</span></span>
+                    <span className="text-xs text-zinc-400 uppercase tracking-wider">{selectedCrate?.name} (x{quantity})</span>
                 </div>
                 </button>
             </div>
@@ -278,10 +277,10 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
 
               <div className={`grid gap-4 ${wonSkins.length === 1 ? 'grid-cols-1' : wonSkins.length === 3 ? 'grid-cols-3' : 'grid-cols-5'}`}>
                 {wonSkins.map((skin, idx) => (
-                  <div key={idx} className={`flex flex-col items-center p-3 rounded-sm border-2 bg-black/50 ${getRarityColor(skin.rarity.name)}`}>
-                    <img src={skin.image} alt={skin.name} className="w-full h-20 object-contain drop-shadow-xl mb-3" />
-                    <h3 className="text-[11px] font-bold text-white text-center w-full truncate">{skin.name}</h3>
-                    <div className="text-[9px] text-zinc-400 mt-1 uppercase tracking-wider">{skin.wear}</div>
+                  <div key={idx} className={`flex flex-col items-center p-4 rounded-sm border-2 bg-black/50 ${getRarityColor(skin.rarity.name)}`}>
+                    <img src={skin.image} alt={skin.name} className="w-full h-24 object-contain drop-shadow-xl mb-3" />
+                    <h3 className="text-xs font-bold text-white text-center w-full truncate">{skin.name}</h3>
+                    <div className="text-[10px] text-zinc-400 mt-1 uppercase tracking-wider">{skin.wear}</div>
                     <div className="text-[10px] font-mono text-zinc-500 mt-0.5">Float: {skin.float}</div>
                     <div className="text-sm font-black text-green-400 mt-2">${skin.price.toFixed(2)}</div>
                   </div>
