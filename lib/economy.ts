@@ -91,3 +91,22 @@ export async function getEstimatedPrice(skin: any) {
 }
 
 export const CASE_PRICE = 2.50;
+
+// ... mevcut kodların üstte kalabilir ...
+
+// SİLAH KATEGORİSİ BULMA
+export function getWeaponCategory(skinName: string) {
+  const name = skinName.toLowerCase();
+  
+  if (name.includes("knife") || name.includes("karambit") || name.includes("bayonet") || name.includes("talon") || name.includes("m9") || name.includes("butterfly") || name.includes("huntsman") || name.includes("falchion") || name.includes("bowie") || name.includes("shadow") || name.includes("stiletto") || name.includes("ursus") || name.includes("navaja") || name.includes("nomad") || name.includes("skeleton") || name.includes("gloves") || name.includes("wraps") || name.includes("★")) return "Bıçak / Eldiven";
+  
+  if (["ak-47", "m4a4", "m4a1-s", "awp", "ssg 08", "aug", "sg 553", "famas", "galil", "scar-20", "g3sg1"].some(w => name.includes(w))) return "Tüfek";
+  
+  if (["mp9", "mac-10", "mp7", "mp5-sd", "ump-45", "p90", "pp-bizon"].some(w => name.includes(w))) return "Hafif Makineli";
+  
+  if (["nova", "xm1014", "sawed-off", "mag-7", "m249", "negev"].some(w => name.includes(w))) return "Ağır Silah";
+  
+  if (["glock", "usp-s", "p2000", "p250", "five-seven", "tec-9", "cz75", "desert eagle", "r8 revolver", "dual berettas"].some(w => name.includes(w))) return "Tabanca";
+  
+  return "Diğer";
+}

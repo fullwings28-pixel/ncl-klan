@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchCrates, Crate, Skin } from "@/lib/csgo-api"
 import { supabase } from "@/lib/supabaseClient"
-import { Gift, Sparkles, X, Package } from "lucide-react"
+import { Gift, Sparkles, X, Package, Coins } from "lucide-react"
 import CustomAlert from "@/components/CustomAlert"
 import { CASE_PRICE } from "@/lib/economy"
 
@@ -29,7 +29,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false)
 
   const [loading, setLoading] = useState(true)
-
   const [alertState, setAlertState] = useState({ isOpen: false, message: "", type: "info" as "info" | "error" | "success" })
   const showAlert = (message: string, type: "info" | "error" | "success" = "info") => setAlertState({ isOpen: true, message, type })
 
@@ -54,12 +53,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       const apiCrates = await fetchCrates()
       const { data: customData } = await supabase.from("custom_cases").select("*")
       const formattedCustom = (customData || []).map(c => ({
-        id: c.id,
-        name: c.name,
-        image: c.image_url,
-        isCustom: true,
-        customPrice: Number(c.price),
-        contains: []
+        id: c.id, name: c.name, image: c.image_url, isCustom: true, customPrice: Number(c.price), contains: []
       }))
 
       const allCrates = [...formattedCustom, ...apiCrates]
@@ -173,11 +167,37 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     }
   }
 
+  // KASA AÇILDIKTAN SONRA KARAR VERME
+  const handleClaim = async (action: 'save' | 'sell') => {
+    if (!wonSkins) return
+    setIsClaiming(true)
+
+    const res = await fetch("/api/case/claim", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ skins: wonSkins, action })
+    })
+    
+    const data = await res.json()
+
+    if (res.ok) {
+      if (action === 'save') {
+        showAlert("Eşyalar envanterine eklendi!", "success")
+      } else {
+        setBalance(data.newBalance)
+        showAlert(`Eşyalar satıldı! Hesabına $${data.soldFor.toFixed(2)} eklendi.`, "success")
+      }
+      setWonSkins(null)
+    } else {
+      showAlert("İşlem başarısız.", "error")
+    }
+    setIsClaiming(false)
+  }
+
   const getRarityColor = (rarityName: string) => {
     switch (rarityName) {
-      case "Rare Special": return "text-yellow-400 border-yellow-400 bg-yellow-500/10 shadow-[0_0_10px_rgba(250,204,21,0.2)]"
-      case "Covert": return "text-red-500 border-red-500 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
-      case "Classified": return "text-pink-500 border-pink-500 bg-pink-500/10 shadow-[0_0_10px_rgba(236,72,153,0.2)]"
+      case "Rare Special": return "text-yellow-400 border-yellow-400 bg-yellow-500/10"
+      case "Covert": return "text-red-500 border-red-500 bg-red-500/10"
+      case "Classified": return "text-pink-500 border-pink-500 bg-pink-500/10"
       case "Restricted": return "text-purple-500 border-purple-500 bg-purple-500/10"
       case "Mil-Spec Grade": return "text-blue-400 border-blue-400 bg-blue-500/10"
       default: return "text-gray-400 border-gray-400 bg-gray-500/10"
@@ -201,9 +221,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
             <span className="text-green-500 font-black text-xl">$</span>
             <div className="text-lg font-black text-white">{Number(balance).toFixed(2)} <span className="text-[10px] text-green-500 uppercase tracking-widest">BAKİYE</span></div>
           </div>
-          <button onClick={() => {}} disabled={isClaiming} className="bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-200 px-5 py-2 rounded-sm text-xs font-bold flex items-center gap-2 transition uppercase tracking-widest disabled:opacity-50">
-            <Gift size={16} /> GÜNLÜK ÖDÜL
-          </button>
         </div>
       </div>
 
@@ -213,11 +230,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
           {crates.map((crate) => (
             <button key={crate.id} onClick={() => !isOpening && setSelectedCrate(crate)}
               className={`flex-shrink-0 w-32 p-3 rounded-sm border transition-all duration-300 relative ${selectedCrate?.id === crate.id ? "border-red-500/50 bg-red-500/10 shadow-[inset_0_0_20px_rgba(239,68,68,0.1)]" : "border-white/5 bg-[#0a0f1c]/50 hover:border-white/20 hover:bg-white/5"} ${isOpening ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              
-              {crate.isCustom && (
-                <div className="absolute -top-2 -right-2 bg-purple-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-sm border border-purple-400 z-10">ÖZEL</div>
-              )}
-
+              {crate.isCustom && <div className="absolute -top-2 -right-2 bg-purple-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-sm border border-purple-400 z-10">ÖZEL</div>}
               <img src={crate.image} alt={crate.name} className={`w-full h-16 object-contain mb-2 transition-transform duration-300 ${selectedCrate?.id === crate.id ? 'scale-110 drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]' : 'opacity-70 group-hover:opacity-100'}`} />
               <div className="text-[10px] font-bold text-zinc-300 text-center truncate w-full uppercase tracking-wider">{crate.name}</div>
             </button>
@@ -230,14 +243,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
             {reels.map((reel, index) => (
                 <div key={index} className="w-full relative overflow-hidden bg-[#050811] border border-white/10 rounded-md py-4">
                     <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
-                    <motion.div 
-                        key={`${reelKey}-${index}`} 
-                        className="flex gap-3" 
-                        initial={{ x: 0 }} 
-                        animate={{ x: reel.target }} 
-                        transition={{ duration: reel.duration, ease: [0.1, 0.9, 0.2, 1] }} 
-                        ref={(el) => { rowRefs.current[index] = el }}
-                    >
+                    <motion.div key={`${reelKey}-${index}`} className="flex gap-3" initial={{ x: 0 }} animate={{ x: reel.target }} transition={{ duration: reel.duration, ease: [0.1, 0.9, 0.2, 1] }} ref={(el) => { rowRefs.current[index] = el }}>
                         {reel.items.map((skin, i) => (
                             <div key={i} className={`flex-shrink-0 w-[140px] h-40 bg-[#0a0f1c] border-2 rounded-sm p-3 flex flex-col items-center justify-between ${getRarityColor(skin.rarity.name)}`}>
                                 <img src={skin.image} alt={skin.name} className="w-full h-24 object-contain drop-shadow-xl" />
@@ -256,18 +262,13 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
             <div className="flex flex-col items-center justify-center h-40 gap-6">
                 <div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-sm border border-white/10">
                 {[1, 3, 5].map(q => (
-                    <button key={q} onClick={() => setQuantity(q)} className={`px-6 py-2 text-sm font-bold rounded-sm transition-colors ${quantity === q ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}>
-                    {q}x AÇ
-                    </button>
+                    <button key={q} onClick={() => setQuantity(q)} className={`px-6 py-2 text-sm font-bold rounded-sm transition-colors ${quantity === q ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}>{q}x AÇ</button>
                 ))}
                 </div>
-
                 <button onClick={openCase} className="group relative bg-red-600/10 border border-red-500/30 p-2 rounded-md hover:bg-red-600/20 hover:scale-105 transition-all flex items-center gap-6 px-12 py-5 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
                 {selectedCrate && <img src={selectedCrate.image} alt={selectedCrate.name} className="w-16 h-16 group-hover:animate-bounce" />}
                 <div className="flex flex-col items-start">
-                    <span className="text-xl font-black text-white uppercase tracking-widest">
-                      KASA AÇ <span className="text-green-500">(${((selectedCrate?.isCustom ? selectedCrate.customPrice : CASE_PRICE) * quantity).toFixed(2)})</span>
-                    </span>
+                    <span className="text-xl font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${((selectedCrate?.isCustom ? selectedCrate.customPrice : CASE_PRICE) * quantity).toFixed(2)})</span></span>
                     <span className="text-xs text-zinc-400 uppercase tracking-wider">{selectedCrate?.name} (x{quantity})</span>
                 </div>
                 </button>
@@ -275,6 +276,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         </div>
       )}
 
+      {/* KAZANILAN SKINLER MODALI (YENİ SEÇENEKLER) */}
       <AnimatePresence>
         {!isOpening && wonSkins && wonSkins.length > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
@@ -282,25 +284,40 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
               className="bg-[#0a0f1c] border-2 border-white/10 p-6 rounded-md max-w-5xl w-full relative shadow-[0_0_50px_rgba(0,0,0,1)]"
             >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
-              <button onClick={() => setWonSkins(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"><X size={20} /></button>
               
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-black text-white tracking-widest">KAZANILANLAR (x{wonSkins.length})</h2>
+                <p className="text-zinc-400 text-xs uppercase tracking-widest mt-1">Ne yapmak istersin?</p>
               </div>
 
-              <div className={`grid gap-4 ${wonSkins.length === 1 ? 'grid-cols-1' : wonSkins.length === 3 ? 'grid-cols-3' : 'grid-cols-5'}`}>
+              <div className={`grid gap-4 mb-8 ${wonSkins.length === 1 ? 'grid-cols-1' : wonSkins.length === 3 ? 'grid-cols-3' : 'grid-cols-5'}`}>
                 {wonSkins.map((skin, idx) => (
-                  <div key={idx} className={`flex flex-col items-center p-4 rounded-sm border-2 bg-black/50 ${getRarityColor(skin.rarity.name)}`}>
-                    <img src={skin.image} alt={skin.name} className="w-full h-24 object-contain drop-shadow-xl mb-3" />
-                    <h3 className="text-xs font-bold text-white text-center w-full truncate">{skin.name}</h3>
+                  <div key={idx} className={`flex flex-col items-center p-4 rounded-sm border-2 bg-black/50 ${getRarityColor(skin.skin_rarity)}`}>
+                    <img src={skin.skin_image} alt={skin.skin_name} className="w-full h-24 object-contain drop-shadow-xl mb-3" />
+                    <h3 className="text-xs font-bold text-white text-center w-full truncate">{skin.skin_name}</h3>
                     <div className="text-[10px] text-zinc-400 mt-1 uppercase tracking-wider">{skin.wear}</div>
                     <div className="text-[10px] font-mono text-zinc-500 mt-0.5">Float: {skin.float}</div>
-                    <div className="text-sm font-black text-green-400 mt-2">${skin.price.toFixed(2)}</div>
+                    <div className="text-sm font-black text-green-400 mt-2">${Number(skin.price).toFixed(2)}</div>
                   </div>
                 ))}
               </div>
 
-              <button onClick={() => setWonSkins(null)} className="w-full mt-8 bg-white text-black hover:bg-zinc-200 py-3 rounded-sm text-sm font-black uppercase tracking-widest transition-colors">ENVANTERE EKLE</button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button 
+                  onClick={() => handleClaim('sell')} 
+                  disabled={isClaiming}
+                  className="flex-1 bg-yellow-600/20 hover:bg-yellow-600 text-yellow-500 hover:text-white border border-yellow-500/30 py-4 rounded-sm text-sm font-black uppercase tracking-widest transition flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Coins size={18}/> TÜMÜNÜ SAT (${wonSkins.reduce((acc, s) => acc + Number(s.price), 0).toFixed(2)})
+                </button>
+                <button 
+                  onClick={() => handleClaim('save')} 
+                  disabled={isClaiming}
+                  className="flex-1 bg-green-600 hover:bg-green-500 text-white py-4 rounded-sm text-sm font-black uppercase tracking-widest transition shadow-[0_0_20px_rgba(34,197,94,0.3)] disabled:opacity-50"
+                >
+                  ENVANTERE EKLE
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
