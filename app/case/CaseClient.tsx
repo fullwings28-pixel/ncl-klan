@@ -2,15 +2,18 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchCrates, Crate, Skin } from "@/lib/csgo-api"
-import { Coins, Gift, Sparkles, X, Package } from "lucide-react"
+import { Gift, Sparkles, X, Package } from "lucide-react"
 import CustomAlert from "@/components/CustomAlert"
+import { CASE_PRICE } from "@/lib/economy"
 
 export default function CaseClient({ currentUser }: { currentUser: any }) {
   const [balance, setBalance] = useState(currentUser.balance || 0)
   const [crates, setCrates] = useState<Crate[]>([])
   const [selectedCrate, setSelectedCrate] = useState<Crate | null>(null)
-  const [quantity, setQuantity] = useState(1) // Çoklu açma state'i
+  const [quantity, setQuantity] = useState(1)
   const [isOpening, setIsOpening] = useState(false)
+  
+  // KAZANILANLARI ANİMASYON BİTENE KADAR TUTACAĞIMIZ STATE
   const [wonSkins, setWonSkins] = useState<any[] | null>(null)
   const [isClaiming, setIsClaiming] = useState(false)
   const [reel, setReel] = useState<Skin[]>([])
@@ -20,7 +23,10 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   const [reelKey, setReelKey] = useState(0)
   
   const containerRef = useRef<HTMLDivElement>(null)
-  const winningSkinRef = useRef<any>(null)
+  
+  // KRİTİK EKLENTİ: API'den gelen sonucu animasyon bitene kadar burada tutuyoruz
+  const resultRef = useRef<any[] | null>(null) 
+  
   const tickAudioRef = useRef<HTMLAudioElement | null>(null)
   const tickTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false)
@@ -78,10 +84,13 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   }
 
   const openCase = async () => {
-    const cost = 2.50 * quantity;
-    if (!selectedCrate || balance < cost) return showAlert(`Yetersiz bakiye! ${quantity} kasa için $${cost.toFixed(2)} gerekli.`, "error")
+    const cost = CASE_PRICE * quantity;
+    if (!selectedCrate || Number(balance) < cost) return showAlert(`Yetersiz bakiye! ${quantity} kasa için $${cost.toFixed(2)} gerekli.`, "error")
     
-    setIsOpening(true); setWonSkins(null); setAnimationTarget(0)
+    // Animasyonu ve sesi başlat
+    setIsOpening(true); 
+    setWonSkins(null); 
+    setAnimationTarget(0)
     playTickSequence(4500);
 
     try {
@@ -93,15 +102,33 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
 
       if (!res.ok) { showAlert(data.error || "Kasa açılamadı.", "error"); setIsOpening(false); return }
       
-      // Kazanılan ilk skini animasyonun ortasına koy (Görsel şov)
-      winningSkinRef.current = data.skins[0]
+      // API'den gelen skini ref'e kaydet (henüz modal açma!)
+      resultRef.current = data.skins;
 
       const pool = selectedCrate.contains || []
       const newReel = Array.from({ length: 60 }).map(() => pool[Math.floor(Math.random() * pool.length)])
+      
       const winningIndex = 55
-      newReel[winningIndex] = data.skins[0]
-      setReel(newReel); setBalance(data.newBalance)
-      setWonSkins(data.skins) // Hepsini kaydet
+      
+      // Çoklu açmada şeridin farklı yerlerine kazanılan skinleri yerleştir
+      if (data.skins.length > 0) {
+        newReel[winningIndex] = data.skins[0];
+      }
+      if (data.skins.length > 1) {
+        newReel[winningIndex - 10] = data.skins[1];
+      }
+      if (data.skins.length > 2) {
+        newReel[winningIndex - 20] = data.skins[2];
+      }
+      if (data.skins.length > 3) {
+        newReel[winningIndex - 30] = data.skins[3];
+      }
+      if (data.skins.length > 4) {
+        newReel[winningIndex - 40] = data.skins[4];
+      }
+
+      setReel(newReel); 
+      setBalance(data.newBalance)
 
       setTimeout(() => {
         if (containerRef.current) {
@@ -123,10 +150,16 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     }
   }
 
+  // ANİMASYON BİTİNCE TETİKLENİR
   const handleAnimationComplete = () => {
     if (isOpening && animationTarget !== 0) {
       setIsOpening(false)
       if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
+      
+      // Animasyon bittikten sonra modalı aç!
+      if (resultRef.current) {
+        setWonSkins(resultRef.current);
+      }
     }
   }
 
@@ -196,7 +229,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
           </motion.div>
         ) : (
           <div className="flex flex-col items-center justify-center h-36 gap-4">
-            {/* Çoklu Açma Seçici */}
             <div className="flex items-center gap-2 bg-black/40 p-1 rounded-sm border border-white/10">
               {[1, 3, 5].map(q => (
                 <button key={q} onClick={() => setQuantity(q)} className={`px-4 py-1.5 text-xs font-bold rounded-sm transition-colors ${quantity === q ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}>
@@ -208,7 +240,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
             <button onClick={openCase} className="group relative bg-red-600/10 border border-red-500/30 p-1 rounded-md hover:bg-red-600/20 hover:scale-105 transition-all flex items-center gap-5 px-10 py-4 shadow-[0_0_30px_rgba(239,68,68,0.1)]">
               {selectedCrate && <img src={selectedCrate.image} alt={selectedCrate.name} className="w-14 h-14 group-hover:animate-bounce" />}
               <div className="flex flex-col items-start">
-                <span className="text-lg font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${(2.50 * quantity).toFixed(2)})</span></span>
+                <span className="text-lg font-black text-white uppercase tracking-widest">KASA AÇ <span className="text-green-500">(${(CASE_PRICE * quantity).toFixed(2)})</span></span>
                 <span className="text-[10px] text-zinc-400 uppercase tracking-wider">{selectedCrate?.name} (x{quantity})</span>
               </div>
             </button>
@@ -216,12 +248,12 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         )}
       </div>
 
-      {/* KAZANILAN SKINLER MODALI */}
       <AnimatePresence>
-        {wonSkins && wonSkins.length > 0 && (
+        {/* MODAL SADECE isOpening FALSE İSE VE wonSkins DOLUYSA AÇILIR */}
+        {!isOpening && wonSkins && wonSkins.length > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-[#0a0f1c] border-2 border-white/10 p-6 rounded-md max-w-4xl w-full relative shadow-[0_0_50px_rgba(0,0,0,1)]"
+              className="bg-[#0a0f1c] border-2 border-white/10 p-6 rounded-md max-w-5xl w-full relative shadow-[0_0_50px_rgba(0,0,0,1)]"
             >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
               <button onClick={() => setWonSkins(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"><X size={20} /></button>
