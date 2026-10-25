@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchCrates, Crate, Skin } from "@/lib/csgo-api"
-import { Coins, Gift, Sparkles, X, Package, Sparkle } from "lucide-react"
+import { Coins, Gift, Sparkles, X, Package } from "lucide-react"
 import CustomAlert from "@/components/CustomAlert"
 
 export default function CaseClient({ currentUser }: { currentUser: any }) {
@@ -21,19 +21,34 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const cratesContainerRef = useRef<HTMLDivElement>(null)
   const winningSkinRef = useRef<Skin | null>(null)
+  
+  // KASA AÇMA SESİ İÇİN REF
+  const openAudioRef = useRef<HTMLAudioElement | null>(null)
 
   const [alertState, setAlertState] = useState({ isOpen: false, message: "", type: "info" as "info" | "error" | "success" })
   const showAlert = (message: string, type: "info" | "error" | "success" = "info") => setAlertState({ isOpen: true, message, type })
 
   useEffect(() => {
+    // Kasa açılma/kayma sesi (Tıkırtı/Whoosh efekti)
+    openAudioRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2005/2005-preview.mp3")
+    openAudioRef.current.volume = 0.6
+    
+    // Ses engelini aş
+    const unlock = () => {
+      if(openAudioRef.current) {
+        openAudioRef.current.play().then(() => openAudioRef.current!.pause()).catch(()=>{})
+      }
+      document.removeEventListener('click', unlock)
+    }
+    document.addEventListener('click', unlock)
+
     fetchCrates().then(data => {
       setCrates(data)
       if (data.length > 0) setSelectedCrate(data[0])
       setLoading(false)
-    }).catch(err => {
-      console.error("Kasa listesi yüklenemedi:", err)
-      setLoading(false)
-    })
+    }).catch(err => setLoading(false))
+
+    return () => document.removeEventListener('click', unlock)
   }, [])
 
   const claimDaily = async () => {
@@ -41,15 +56,9 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     try {
       const res = await fetch("/api/case/daily", { method: "POST" })
       const data = await res.json()
-      if (res.ok && data.success) { 
-        setBalance(data.newBalance); 
-        showAlert("500 Kredi hesabına eklendi.", "success") 
-      } else { 
-        showAlert(data.error || "Bir hata oluştu.", "error") 
-      }
-    } catch (e) {
-      showAlert("Sunucuya bağlanılamadı.", "error")
-    }
+      if (res.ok && data.success) { setBalance(data.newBalance); showAlert("500 Kredi hesabına eklendi.", "success") } 
+      else { showAlert(data.error || "Bir hata oluştu.", "error") }
+    } catch (e) { showAlert("Sunucuya bağlanılamadı.", "error") }
     setIsClaiming(false)
   }
 
@@ -57,31 +66,19 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     if (!selectedCrate || balance < 100) return showAlert("Yetersiz bakiye! Günlük ödülünü al.", "error")
     setIsOpening(true); setWonSkin(null); setAnimationTarget(0)
 
+    // SESİ ÇAL
+    if (openAudioRef.current) {
+      openAudioRef.current.currentTime = 0;
+      openAudioRef.current.play().catch(() => {});
+    }
+
     try {
-      const res = await fetch("/api/case/open", { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ crateId: selectedCrate.id }) 
-      })
-      
-      // API'den gelen yanıtı güvenli okuma
+      const res = await fetch("/api/case/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crateId: selectedCrate.id }) })
       const text = await res.text()
       let data;
-      
-      try {
-        data = JSON.parse(text)
-      } catch (parseError) {
-        console.error("API'den geçersiz yanıt geldi:", text)
-        showAlert("Sunucu hatası oluştu. Lütfen terminali kontrol edin.", "error")
-        setIsOpening(false)
-        return
-      }
+      try { data = JSON.parse(text) } catch (parseError) { showAlert("Sunucu hatası.", "error"); setIsOpening(false); return }
 
-      if (!res.ok) { 
-        showAlert(data.error || "Kasa açılamadı.", "error"); 
-        setIsOpening(false); 
-        return 
-      }
+      if (!res.ok) { showAlert(data.error || "Kasa açılamadı.", "error"); setIsOpening(false); return }
       
       winningSkinRef.current = data.skin
 
@@ -106,7 +103,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       }, 50)
 
     } catch (error) {
-      console.error("Ağ hatası:", error)
       showAlert("Sunucuya bağlanılamadı.", "error")
       setIsOpening(false)
     }
