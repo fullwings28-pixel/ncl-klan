@@ -1,8 +1,10 @@
 "use client"
 import { useState, useEffect } from "react"
 import Navbar from "@/components/Navbar"
-import { ShieldBan, ShieldCheck, VolumeX, ShieldAlert, Plus, Save, Megaphone, Coins, X, Flag, Trash, Sparkles, Wand2 } from "lucide-react"
+import { ShieldBan, ShieldCheck, VolumeX, ShieldAlert, Plus, Save, Coins, X, Flag, Trash, Sparkles, Wand2, Search } from "lucide-react"
 import { useToast } from "@/components/Toast"
+import { fetchSkins, Skin } from "@/lib/csgo-api"
+import { getWear, getFloatMultiplier, getSkinMultiplier, RARITY_BASE_PRICES } from "@/lib/economy"
 
 export default function AdminPanelClient({ users, logs, bannedWords, reports, adminProfile }: any) {
   const [reason, setReason] = useState("")
@@ -16,7 +18,7 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
   // Kredi Verme Modalı
   const [creditModal, setCreditModal] = useState({ isOpen: false, userId: "", userName: "", amount: "" })
 
-  // KASA OLUŞTURMA STATE'LERİ (YENİ)
+  // KASA OLUŞTURMA STATE'LERİ
   const [showCaseModal, setShowCaseModal] = useState(false)
   const [caseName, setCaseName] = useState("")
   const [casePrompt, setCasePrompt] = useState("")
@@ -25,12 +27,57 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
   const [caseItems, setCaseItems] = useState<any[]>([])
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
 
+  // SKİN SEÇİCİ (SKIN PICKER) STATE'LERİ
+  const [isSkinPickerOpen, setIsSkinPickerOpen] = useState(false)
+  const [allSkins, setAllSkins] = useState<Skin[]>([])
+  const [skinSearch, setSkinSearch] = useState("")
+  const [isLoadingSkins, setIsLoadingSkins] = useState(false)
+
   const { showToast } = useToast()
 
   useEffect(() => {
     fetch("/api/settings").then(res => res.json()).then(data => setSiteName(data.site_name))
     fetch("/api/rooms").then(res => res.json()).then(data => setRooms(data))
   }, [])
+
+  // Skin Picker açıldığında tüm skinleri çek
+  const openSkinPicker = async () => {
+    setIsSkinPickerOpen(true)
+    if (allSkins.length === 0) {
+      setIsLoadingSkins(true)
+      const skins = await fetchSkins()
+      setAllSkins(skins)
+      setIsLoadingSkins(false)
+    }
+  }
+
+  // Skin Seçildiğinde forma ekle
+  const handleSelectSkin = (skin: Skin) => {
+    // Skinin tahmini fiyatını hesapla (Nadirlik + Popülerlik)
+    const basePrice = RARITY_BASE_PRICES[skin.rarity.name] || 1.00
+    const multiplier = getSkinMultiplier(skin.name)
+    const estimatedPrice = (basePrice * multiplier).toFixed(2)
+
+    setCaseItems([
+      ...caseItems, 
+      { 
+        skin_id: skin.id,
+        skin_name: skin.name, 
+        skin_image: skin.image, 
+        skin_rarity: skin.rarity.name, 
+        chance: "10", // Varsayılan %10 şans
+        price: estimatedPrice 
+      }
+    ])
+    setIsSkinPickerOpen(false)
+    setSkinSearch("")
+  }
+
+  // Filtrelenmiş skinler
+  const filteredSkins = allSkins.filter(s => 
+    s.name.toLowerCase().includes(skinSearch.toLowerCase()) || 
+    s.weapon?.name.toLowerCase().includes(skinSearch.toLowerCase())
+  )
 
   const handleAction = async (userId: string, action: string) => {
     const res = await fetch("/api/admin/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ targetUserId: userId, action, reason }) })
@@ -86,16 +133,14 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     showToast("Kelime silindi.", "success"); setTimeout(() => window.location.reload(), 1000)
   }
 
-  // YAPAY ZEKA İLE KASA RESMİ OLUŞTURMA
   const generateCaseImage = () => {
     if (!casePrompt.trim()) return showToast("Lütfen bir görsel komutu girin.", "error")
     setIsGeneratingImage(true)
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(casePrompt)}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random() * 10000)}`
     setCaseImageUrl(url)
-    setTimeout(() => setIsGeneratingImage(false), 2000) // Görselin yüklenmesi için görsel bekleme efekti
+    setTimeout(() => setIsGeneratingImage(false), 2000)
   }
 
-  // YENİ KASA KAYDETME
   const handleSaveCase = async () => {
     if (!caseName.trim() || !caseImageUrl || caseItems.length === 0) return showToast("Lütfen isim, resim ve en az bir eşya ekleyin.", "error")
     
@@ -199,7 +244,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
 
         </div>
 
-        {/* KASA YÖNETİMİ BUTONU */}
         <div className="hud-panel p-5 rounded-md flex justify-between items-center border border-purple-500/30">
           <div>
             <h2 className="text-lg font-black text-white uppercase tracking-widest flex items-center gap-2">
@@ -347,36 +391,38 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
               </div>
               
               {/* SAĞ TARAF: İÇERİK EKLEME */}
-              <div className="bg-black/30 border border-white/5 p-5 rounded-md">
-                <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
+              <div className="bg-black/30 border border-white/5 p-5 rounded-md flex flex-col h-[500px]">
+                <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2 shrink-0">
                   <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest">Kasa İçeriği</h3>
                   <div className={`text-xs font-bold ${caseItems.reduce((sum, item) => sum + Number(item.chance), 0) > 100 ? "text-red-500" : "text-green-500"}`}>
                     Toplam Şans: %{caseItems.reduce((sum, item) => sum + Number(item.chance), 0)}
                   </div>
                 </div>
 
-                <div className="space-y-2 max-h-[350px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="space-y-2 overflow-y-auto custom-scrollbar pr-2 flex-1">
                   {caseItems.map((item, idx) => (
                     <div key={idx} className="flex gap-2 items-center bg-black/40 p-2 border border-white/5 rounded-sm">
-                      <input type="text" value={item.skin_name} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].skin_name = e.target.value; setCaseItems(newItems); }} placeholder="Skin Adı" className="w-1/3 bg-[#050811] border border-white/10 rounded-sm px-2 py-1.5 text-xs text-white" />
-                      <input type="text" value={item.skin_image} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].skin_image = e.target.value; setCaseItems(newItems); }} placeholder="Resim URL" className="w-1/4 bg-[#050811] border border-white/10 rounded-sm px-2 py-1.5 text-xs text-white" />
-                      <select value={item.skin_rarity} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].skin_rarity = e.target.value; setCaseItems(newItems); }} className="w-24 bg-[#050811] border border-white/10 rounded-sm px-1 py-1.5 text-xs text-white uppercase">
-                        <option value="Mil-Spec Grade">Mavi</option>
-                        <option value="Restricted">Mor</option>
-                        <option value="Classified">Pembe</option>
-                        <option value="Covert">Kırmızı</option>
-                        <option value="Rare Special">Bıçak</option>
-                      </select>
-                      <input type="number" value={item.chance} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].chance = e.target.value; setCaseItems(newItems); }} placeholder="Şans %" className="w-16 bg-[#050811] border border-white/10 rounded-sm px-2 py-1.5 text-xs text-white" />
-                      <input type="number" value={item.price} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].price = e.target.value; setCaseItems(newItems); }} placeholder="Fiyat $" className="w-20 bg-[#050811] border border-white/10 rounded-sm px-2 py-1.5 text-xs text-white" />
-                      <button onClick={() => setCaseItems(caseItems.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-500/10 p-1.5 rounded-sm transition"><Trash size={14}/></button>
+                      <img src={item.skin_image} alt={item.skin_name} className="w-10 h-10 object-contain" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-bold text-white truncate">{item.skin_name}</div>
+                        <div className="text-[8px] text-zinc-500 uppercase">{item.skin_rarity}</div>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <label className="text-[8px] text-zinc-500 font-bold uppercase mb-0.5">Şans %</label>
+                        <input type="number" value={item.chance} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].chance = e.target.value; setCaseItems(newItems); }} className="w-16 bg-[#050811] border border-white/10 rounded-sm px-2 py-1 text-center text-xs text-white" />
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <label className="text-[8px] text-zinc-500 font-bold uppercase mb-0.5">Fiyat $</label>
+                        <input type="number" value={item.price} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].price = e.target.value; setCaseItems(newItems); }} className="w-20 bg-[#050811] border border-white/10 rounded-sm px-2 py-1 text-center text-xs text-white" />
+                      </div>
+                      <button onClick={() => setCaseItems(caseItems.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-500/10 p-1.5 rounded-sm transition self-end mb-0.5"><Trash size={14}/></button>
                     </div>
                   ))}
                   {caseItems.length === 0 && <div className="text-center py-6 text-zinc-600 text-xs uppercase tracking-widest">Henüz eşya eklenmedi.</div>}
                 </div>
                 
-                <button onClick={() => setCaseItems([...caseItems, { skin_name: "", skin_image: "", skin_rarity: "Mil-Spec Grade", chance: "10", price: "1.50" }])} className="w-full mt-4 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold py-2.5 rounded-sm text-zinc-300 transition uppercase tracking-widest">
-                  + Yeni Eşya Ekle
+                <button onClick={openSkinPicker} className="w-full mt-4 bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 text-purple-400 hover:text-white text-xs font-bold py-3 rounded-sm transition uppercase tracking-widest flex items-center justify-center gap-2 shrink-0">
+                  <Search size={14}/> Skin Seç ve Ekle
                 </button>
               </div>
             </div>
@@ -384,6 +430,54 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
             <button onClick={handleSaveCase} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-sm text-sm uppercase tracking-widest transition shadow-[0_0_20px_rgba(168,85,247,0.3)]">
               Kasayı Sisteme Kaydet
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* SKİN SEÇİCİ MODALI */}
+      {isSkinPickerOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="bg-[#0a0f1c] border border-white/10 p-6 rounded-md max-w-4xl w-full relative shadow-2xl flex flex-col h-[80vh]">
+            <button onClick={() => setIsSkinPickerOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={24}/></button>
+            
+            <h2 className="text-xl font-black text-white uppercase tracking-widest mb-4">Skin Seç</h2>
+            
+            <div className="relative mb-4 shrink-0">
+              <Search size={18} className="absolute left-3 top-3 text-zinc-500" />
+              <input 
+                type="text" 
+                value={skinSearch} 
+                onChange={e => setSkinSearch(e.target.value)} 
+                placeholder="Skin veya Silah Ara (Örn: AWP Asiimov)" 
+                className="w-full bg-black/50 border border-white/10 rounded-sm pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500" 
+              />
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+              {isLoadingSkins ? (
+                <div className="text-center py-20 text-purple-500 animate-pulse font-bold uppercase tracking-widest">Skinler Yükleniyor...</div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {filteredSkins.slice(0, 100).map(skin => {
+                    const basePrice = RARITY_BASE_PRICES[skin.rarity.name] || 1
+                    const estimatedPrice = (basePrice * getSkinMultiplier(skin.name)).toFixed(2)
+                    return (
+                      <div 
+                        key={skin.id} 
+                        onClick={() => handleSelectSkin(skin)}
+                        className="bg-black/40 border border-white/5 rounded-sm p-2 cursor-pointer hover:border-purple-500/50 transition flex flex-col items-center text-center group"
+                      >
+                        <img src={skin.image} alt={skin.name} className="w-full h-16 object-contain mb-2 group-hover:scale-110 transition-transform" />
+                        <div className="text-[10px] font-bold text-white truncate w-full">{skin.name}</div>
+                        <div className="text-[9px] text-zinc-500 uppercase mt-0.5">{skin.rarity.name}</div>
+                        <div className="text-[10px] text-green-400 font-black mt-1">~${estimatedPrice}</div>
+                      </div>
+                    )
+                  })}
+                  {filteredSkins.length === 0 && <div className="col-span-full text-center py-10 text-zinc-500 uppercase tracking-widest text-xs">Sonuç bulunamadı.</div>}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
