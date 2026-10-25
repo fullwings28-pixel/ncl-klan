@@ -9,11 +9,20 @@ export function usePresence(currentUser: any) {
   useEffect(() => {
     if (!currentUser) return
 
-    const channel = supabase.channel("online-users", {
-      config: { presence: { key: currentUser.id } },
+    // ÇÖZÜM: Eğer daha önceden açılmış ve abone olunmuş bir "online-users" kanalı varsa, onu temizle.
+    const existingChannels = supabase.getChannels().filter(c => c.topic === 'realtime:online-users')
+    existingChannels.forEach(channel => {
+      supabase.removeChannel(channel)
     })
 
-    // .on() HER ZAMAN .subscribe()'tan ÖNCE gelmeli
+    const channel = supabase.channel("online-users", {
+      config: {
+        presence: {
+          key: currentUser.id,
+        },
+      },
+    })
+
     channel
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState()
@@ -32,7 +41,10 @@ export function usePresence(currentUser: any) {
         }
       })
 
-    return () => { channel.unsubscribe() }
+    return () => {
+      // Bileşen ekrandan kalktığında kanalı temizle
+      supabase.removeChannel(channel)
+    }
   }, [currentUser])
 
   return onlineUsers
