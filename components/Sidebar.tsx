@@ -35,6 +35,7 @@ export default function Sidebar({ isOpen, onClose, profile }: SidebarProps) {
         { name: "Kasa Aç", href: "/case", icon: Gamepad2, color: "text-yellow-500" },
         { name: "Envanter", href: "/inventory", icon: Package, color: "text-green-400" },
         { name: "1v1 Arena", href: "/arena", icon: Swords, color: "text-red-400" },
+        { name: "Kasa Savaşı", href: "/battle", icon: Swords, color: "text-orange-500" },
       ]
     },
     {
