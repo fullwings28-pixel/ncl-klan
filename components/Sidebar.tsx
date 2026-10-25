@@ -1,6 +1,6 @@
 "use client"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, MessageSquare, Send, Gamepad2, Package, Swords, Crown, Map, Calendar, Target, Users, ShieldAlert, LogOut, ArrowUpRight } from "lucide-react"
+import { X, MessageSquare, Send, Gamepad2, Package, Swords, Crown, Map, Calendar, Target, Users, ShieldAlert, LogOut, ArrowUpRight, ArrowRightLeft } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
@@ -33,10 +33,11 @@ export default function Sidebar({ isOpen, onClose, profile }: SidebarProps) {
       title: "Oyun & Eğlence",
       links: [
         { name: "Kasa Aç", href: "/case", icon: Gamepad2, color: "text-yellow-500" },
-        { name: "Upgrade", href: "/upgrade", icon: ArrowUpRight, color: "text-green-500" }, // <-- YENİ EKLENDİ
+        { name: "Upgrade", href: "/upgrade", icon: ArrowUpRight, color: "text-green-500" },
         { name: "Kasa Savaşı", href: "/battle", icon: Swords, color: "text-orange-500" },
         { name: "Envanter", href: "/inventory", icon: Package, color: "text-green-400" },
         { name: "1v1 Arena", href: "/arena", icon: Swords, color: "text-red-400" },
+        { name: "Takas Merkezi", href: "/trades", icon: ArrowRightLeft, color: "text-cyan-400" },
       ]
     },
     {

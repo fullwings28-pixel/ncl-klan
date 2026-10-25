@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
-import { X, Trophy, Calendar, Clock, Skull, Target, ShieldAlert, Send, Flag } from "lucide-react"
+import { X, Trophy, Calendar, Clock, Skull, Target, ShieldAlert, Send, Flag, ArrowRightLeft } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "./Toast"
 
@@ -160,9 +160,14 @@ export default function UserProfileModal({ userId, onClose }: { userId: string, 
                 </div>
                 
                 {currentUser && currentUser.id !== profile.id && (
-                  <button onClick={() => setIsReporting(true)} className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold py-2 rounded-lg transition flex items-center justify-center gap-2 mt-1">
-                    <Flag size={14} /> Kullanıcıyı Şikayet Et
-                  </button>
+                  <>
+                    <Link href={`/trades/create?user=${profile.id}`} onClick={onClose} className="w-full text-center bg-cyan-600/20 hover:bg-cyan-600 border border-cyan-500/30 text-cyan-400 hover:text-white text-xs font-bold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+                      <ArrowRightLeft size={14}/> Takas Teklif Et
+                    </Link>
+                    <button onClick={() => setIsReporting(true)} className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold py-2 rounded-lg transition flex items-center justify-center gap-2 mt-1">
+                      <Flag size={14} /> Kullanıcıyı Şikayet Et
+                    </button>
+                  </>
                 )}
               </div>
             </div>
