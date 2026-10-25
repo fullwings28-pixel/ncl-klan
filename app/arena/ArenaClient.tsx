@@ -1,19 +1,21 @@
 "use client"
 import { useEffect, useState } from "react"
-import { Swords, Check, X, Trophy, Crosshair, Coins, ShieldAlert } from "lucide-react"
+import { Swords, Check, X, Trophy, Crosshair, Coins } from "lucide-react"
 import { createClient } from "@supabase/supabase-js"
 import { useToast } from "@/components/Toast"
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 export default function ArenaClient({ currentUser }: { currentUser: any }) {
-  const [duels, setDuels] = useState<any[]>([])
+  const [duels, setDuels] = useState<any[]>([]) // TİP HATASI DÜZELTİLDİ
   const [players, setPlayers] = useState<any[]>([])
   const [selectedOpponent, setSelectedOpponent] = useState("")
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
 
-  const [betModal, setBetModal] = useState({ isOpen: false, duel: null, winnerId: "", amount: "" })
+  const [betModal, setBetModal] = useState<{ isOpen: boolean, duel: any, winnerId: string, amount: string }>({ 
+    isOpen: false, duel: null, winnerId: "", amount: "" 
+  })
 
   const fetchDuels = async () => {
     const res = await fetch("/api/duels")
@@ -52,7 +54,7 @@ export default function ArenaClient({ currentUser }: { currentUser: any }) {
 
     const res = await fetch("/api/duels/bet", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ duel_id: betModal.duel?.id, predicted_winner_id: betModal.winnerId, amount })
+      body: JSON.stringify({ duel_id: betModal.duel.id, predicted_winner_id: betModal.winnerId, amount })
     })
 
     if (res.ok) { showToast("Bahsin başarıyla alındı!", "success"); setBetModal({ isOpen: false, duel: null, winnerId: "", amount: "" }) } 
@@ -70,15 +72,15 @@ export default function ArenaClient({ currentUser }: { currentUser: any }) {
             <p className="text-xs text-zinc-400 mb-6 uppercase tracking-wider">Sence bu maçı kim kazanır?</p>
             
             <div className="flex gap-3 mb-6">
-              <button onClick={() => setBetModal({ ...betModal, winnerId: betModal.duel!.challenger_id })}
-                className={`flex-1 p-3 rounded-sm border flex flex-col items-center gap-2 transition ${betModal.winnerId === betModal.duel!.challenger_id ? 'bg-cyan-500/20 border-cyan-500 text-white' : 'bg-black/40 border-white/10 text-zinc-400 hover:border-white/30'}`}>
-                <img src={betModal.duel!.challenger.avatar_url} className="w-12 h-12 rounded-sm border border-white/20 grayscale" />
-                <span className="text-xs font-bold uppercase tracking-wider">{betModal.duel!.challenger.display_name}</span>
+              <button onClick={() => setBetModal({ ...betModal, winnerId: betModal.duel.challenger_id })}
+                className={`flex-1 p-3 rounded-sm border flex flex-col items-center gap-2 transition ${betModal.winnerId === betModal.duel.challenger_id ? 'bg-cyan-500/20 border-cyan-500 text-white' : 'bg-black/40 border-white/10 text-zinc-400 hover:border-white/30'}`}>
+                <img src={betModal.duel.challenger.avatar_url} className="w-12 h-12 rounded-sm border border-white/20 grayscale" />
+                <span className="text-xs font-bold uppercase tracking-wider">{betModal.duel.challenger.display_name}</span>
               </button>
-              <button onClick={() => setBetModal({ ...betModal, winnerId: betModal.duel!.opponent_id })}
-                className={`flex-1 p-3 rounded-sm border flex flex-col items-center gap-2 transition ${betModal.winnerId === betModal.duel!.opponent_id ? 'bg-cyan-500/20 border-cyan-500 text-white' : 'bg-black/40 border-white/10 text-zinc-400 hover:border-white/30'}`}>
-                <img src={betModal.duel!.opponent.avatar_url} className="w-12 h-12 rounded-sm border border-white/20 grayscale" />
-                <span className="text-xs font-bold uppercase tracking-wider">{betModal.duel!.opponent.display_name}</span>
+              <button onClick={() => setBetModal({ ...betModal, winnerId: betModal.duel.opponent_id })}
+                className={`flex-1 p-3 rounded-sm border flex flex-col items-center gap-2 transition ${betModal.winnerId === betModal.duel.opponent_id ? 'bg-cyan-500/20 border-cyan-500 text-white' : 'bg-black/40 border-white/10 text-zinc-400 hover:border-white/30'}`}>
+                <img src={betModal.duel.opponent.avatar_url} className="w-12 h-12 rounded-sm border border-white/20 grayscale" />
+                <span className="text-xs font-bold uppercase tracking-wider">{betModal.duel.opponent.display_name}</span>
               </button>
             </div>
 
@@ -112,7 +114,7 @@ export default function ArenaClient({ currentUser }: { currentUser: any }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {duels.map(duel => {
+        {duels.map((duel) => {
           const isChallenger = duel.challenger_id === currentUser.id
           const isOpponent = duel.opponent_id === currentUser.id
           const isAdmin = currentUser.role === 'admin'
