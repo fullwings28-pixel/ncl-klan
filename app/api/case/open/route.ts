@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getSession } from "@/lib/session"
 import { createClient } from "@supabase/supabase-js"
 import { fetchCrates } from "@/lib/csgo-api"
-import { getWear, getPriceMultiplier, RARITY_BASE_PRICES } from "@/lib/economy"
+import { getWear, getFloatMultiplier, getSkinMultiplier, RARITY_BASE_PRICES, CASE_PRICE } from "@/lib/economy"
 
 export async function POST(req: Request) {
   try {
@@ -16,13 +16,12 @@ export async function POST(req: Request) {
     const crate = crates.find((c: any) => c.id === crateId)
     if (!crate) return NextResponse.json({ error: "Kasa bulunamadı" }, { status: 404 })
 
-    // Bakiye Kontrolü (Kasa başı 2.50$ diyelim)
-    const caseCost = 2.50 * quantity;
+    const totalCost = CASE_PRICE * quantity;
     const { data: userProfile } = await supabase.from("profiles").select("balance").eq("id", session.id).single()
     const currentBalance = Number(userProfile?.balance || 0)
 
-    if (currentBalance < caseCost) {
-      return NextResponse.json({ error: `Yetersiz bakiye! ${quantity} kasa için $${caseCost.toFixed(2)} gerekli.` }, { status: 400 })
+    if (currentBalance < totalCost) {
+      return NextResponse.json({ error: `Yetersiz bakiye! ${quantity} kasa için $${totalCost.toFixed(2)} gerekli.` }, { status: 400 })
     }
 
     const wonSkins = [];
@@ -41,16 +40,18 @@ export async function POST(req: Request) {
       let pool: any[] = []
       if (selectedRarity === "Rare Special") pool = crate.contains_rare || []
       else pool = crate.contains?.filter((s: any) => s.rarity.name === selectedRarity) || []
-
       if (pool.length === 0) pool = crate.contains || []
 
       const selectedSkin = pool[Math.floor(Math.random() * pool.length)]
       
       // FLOAT SİSTEMİ
-      const floatVal = Number((Math.random()).toFixed(8)); // 0.00000000 - 0.99999999
+      const floatVal = Number((Math.random()).toFixed(8)); 
       const wear = getWear(floatVal);
+      
+      // FİYAT HESAPLAMA (Nadirlik Baz Fiyat * Float Çarpanı * Skin Popülerlik Çarpanı)
       const basePrice = RARITY_BASE_PRICES[selectedRarity] || 1.00;
-      const finalPrice = Number((basePrice * getPriceMultiplier(floatVal)).toFixed(2));
+      const skinMultiplier = getSkinMultiplier(selectedSkin.name);
+      const finalPrice = Number((basePrice * getFloatMultiplier(floatVal) * skinMultiplier).toFixed(2));
 
       wonSkins.push({ ...selectedSkin, float: floatVal, wear, price: finalPrice });
 
@@ -66,14 +67,13 @@ export async function POST(req: Request) {
       })
     }
 
-    // Bakiyeyi düş ve envantere ekle
-    const newBalance = currentBalance - caseCost
+    const newBalance = currentBalance - totalCost
     await supabase.from("profiles").update({ balance: newBalance }).eq("id", session.id)
     await supabase.from("inventories").insert(inventoryInserts)
 
     return NextResponse.json({
       success: true,
-      skins: wonSkins, // Kazanılan tüm skinlerin listesi
+      skins: wonSkins,
       newBalance,
     })
 
