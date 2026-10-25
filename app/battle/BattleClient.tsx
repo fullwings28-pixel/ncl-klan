@@ -4,7 +4,6 @@ import { createClient } from "@supabase/supabase-js"
 import { Swords, Bot, User, Plus, Coins, Trophy, X } from "lucide-react"
 import { fetchCrates, Crate } from "@/lib/csgo-api"
 import { useToast } from "@/components/Toast"
-import { motion, AnimatePresence } from "framer-motion"
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
@@ -34,8 +33,19 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
   }
 
   useEffect(() => {
-    fetchCrates().then(setCrates)
-    fetchBattles()
+    const loadInitialData = async () => {
+      try {
+        const loadedCrates = await fetchCrates()
+        setCrates(loadedCrates)
+        await fetchBattles()
+      } catch (error) {
+        console.error("Veri yüklenirken hata:", error)
+      } finally {
+        setLoading(false) // <-- BURADAKİ EKSİK BİZİ KURTARACAK
+      }
+    }
+
+    loadInitialData()
     
     const channel = supabase.channel("battle-lobby")
       .on("postgres_changes", { event: "*", schema: "public", table: "battles" }, () => fetchBattles())
@@ -57,7 +67,7 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
     }
 
     fetchBattleData()
-    const interval = setInterval(fetchBattleData, 1000) // Basit polling
+    const interval = setInterval(fetchBattleData, 1500) // 1.5 saniyede bir güncelle
     return () => clearInterval(interval)
   }, [activeBattle?.id])
 
@@ -76,7 +86,7 @@ export default function BattleClient({ currentUser }: { currentUser: any }) {
     if (res.ok) {
       setShowCreate(false)
       showToast("Savaş başlatıldı!", "success")
-      // Direkt savaş ekranına yönlendir
+      
       const { data: b } = await supabase.from("battles").select("*, battle_players(*, profiles(display_name, avatar_url))").eq("id", data.battle_id).single()
       if (b) setActiveBattle(b)
     } else {
