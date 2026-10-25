@@ -6,15 +6,13 @@ export async function POST(req: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 })
 
-  const { skins, action } = await req.json() // action: 'save' veya 'sell'
+  const { skins, action } = await req.json()
   if (!skins || skins.length === 0) return NextResponse.json({ error: "Eşya bulunamadı" }, { status: 400 })
 
   const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
 
   if (action === 'sell') {
-    // Tümünü Sat
     const totalSellPrice = skins.reduce((acc: number, item: any) => acc + Number(item.price), 0)
-    
     const { data: profile } = await supabase.from("profiles").select("balance").eq("id", session.id).single()
     const newBalance = Number(profile?.balance || 0) + totalSellPrice
     
@@ -23,7 +21,6 @@ export async function POST(req: Request) {
   } 
   
   if (action === 'save') {
-    // Envantere Ekle
     const inserts = skins.map((skin: any) => ({
       user_id: session.id,
       skin_id: skin.skin_id,

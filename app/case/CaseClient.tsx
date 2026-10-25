@@ -102,10 +102,23 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         method: "POST", headers: { "Content-Type": "application/json" }, 
         body: JSON.stringify({ crateId: selectedCrate.id, quantity: Number(quantity) })
       })
-      const data = await res.json()
-
-      if (!res.ok) { showAlert(data.error || "Kasa açılamadı.", "error"); setIsOpening(false); return }
       
+      if (!res.ok) { 
+        const errorData = await res.json().catch(() => ({}));
+        showAlert(errorData.error || `Sunucu hatası: ${res.status}`, "error"); 
+        setIsOpening(false); 
+        return 
+      }
+      
+      const data = await res.json();
+      
+      // GÜVENLİK KONTROLÜ: Eğer API'den skinler gelmezse çökmeyi engelle
+      if (!data.skins || !Array.isArray(data.skins) || data.skins.length === 0) {
+        showAlert("Kasa açılamadı, eşyalar gelmedi.", "error");
+        setIsOpening(false);
+        return;
+      }
+
       resultRef.current = data.skins;
 
       const newReels = [];
@@ -167,7 +180,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     }
   }
 
-  // KASA AÇILDIKTAN SONRA KARAR VERME
   const handleClaim = async (action: 'save' | 'sell') => {
     if (!wonSkins) return
     setIsClaiming(true)
@@ -245,12 +257,16 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
                     <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
                     <motion.div key={`${reelKey}-${index}`} className="flex gap-3" initial={{ x: 0 }} animate={{ x: reel.target }} transition={{ duration: reel.duration, ease: [0.1, 0.9, 0.2, 1] }} ref={(el) => { rowRefs.current[index] = el }}>
                         {reel.items.map((skin, i) => (
-                            <div key={i} className={`flex-shrink-0 w-[140px] h-40 bg-[#0a0f1c] border-2 rounded-sm p-3 flex flex-col items-center justify-between ${getRarityColor(skin.rarity.name)}`}>
-                                <img src={skin.image} alt={skin.name} className="w-full h-24 object-contain drop-shadow-xl" />
-                                <div className="text-center w-full bg-black/40 p-1.5 rounded-sm border-t border-white/5">
-                                    <div className="text-[9px] text-zinc-500 uppercase tracking-widest">{skin.weapon?.name || "WEAPON"}</div>
-                                    <div className="text-[11px] font-bold text-white truncate w-full">{skin.name}</div>
-                                </div>
+                            <div key={i} className={`flex-shrink-0 w-[140px] h-40 bg-[#0a0f1c] border-2 rounded-sm p-3 flex flex-col items-center justify-between ${skin ? getRarityColor(skin.rarity.name) : 'border-gray-700'}`}>
+                                {skin ? (
+                                  <>
+                                    <img src={skin.image} alt={skin.name} className="w-full h-24 object-contain drop-shadow-xl" />
+                                    <div className="text-center w-full bg-black/40 p-1.5 rounded-sm border-t border-white/5">
+                                        <div className="text-[9px] text-zinc-500 uppercase tracking-widest">{skin.weapon?.name || "WEAPON"}</div>
+                                        <div className="text-[11px] font-bold text-white truncate w-full">{skin.name}</div>
+                                    </div>
+                                  </>
+                                ) : null}
                             </div>
                         ))}
                     </motion.div>
@@ -276,7 +292,7 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
         </div>
       )}
 
-      {/* KAZANILAN SKINLER MODALI (YENİ SEÇENEKLER) */}
+      {/* KAZANILAN SKINLER MODALI */}
       <AnimatePresence>
         {!isOpening && wonSkins && wonSkins.length > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
