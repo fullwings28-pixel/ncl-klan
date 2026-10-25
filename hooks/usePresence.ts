@@ -1,3 +1,4 @@
+// hooks/usePresence.ts
 "use client"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
@@ -9,14 +10,10 @@ export function usePresence(currentUser: any) {
     if (!currentUser) return
 
     const channel = supabase.channel("online-users", {
-      config: {
-        presence: {
-          key: currentUser.id,
-        },
-      },
+      config: { presence: { key: currentUser.id } },
     })
 
-    // presence dinleyicisi subscribe() ÇAĞRISINDAN ÖNCE eklenmeli
+    // .on() HER ZAMAN .subscribe()'tan ÖNCE gelmeli
     channel
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState()
@@ -35,9 +32,7 @@ export function usePresence(currentUser: any) {
         }
       })
 
-    return () => {
-      channel.unsubscribe()
-    }
+    return () => { channel.unsubscribe() }
   }, [currentUser])
 
   return onlineUsers
