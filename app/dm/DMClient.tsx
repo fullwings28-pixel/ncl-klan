@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
-import { Send, Search, MessageSquare, Terminal } from "lucide-react"
+import { Send, Search, MessageSquare, Terminal, ChevronLeft } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -86,9 +86,10 @@ export default function DMClient({ currentUser }: { currentUser: any }) {
     : chatPartners
 
   return (
-    <div className="flex-1 flex overflow-hidden max-w-[1400px] w-full mx-auto relative z-10 p-4 gap-4 h-[calc(100vh-72px)]">
+    <div className="flex-1 flex overflow-hidden max-w-[1400px] w-full mx-auto relative z-10 p-2 sm:p-4 gap-2 sm:gap-4 h-[calc(100vh-72px)]">
       
-      <div className="w-64 bg-[#0a0f1c]/80 border border-white/5 rounded-md flex flex-col hidden sm:flex backdrop-blur-xl">
+      {/* SOL MENÜ */}
+      <div className={`w-full md:w-64 bg-[#0a0f1c]/80 border border-white/5 rounded-md flex-col backdrop-blur-xl ${activeUser ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-4 border-b border-white/5">
           <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-3 flex items-center gap-2"><Terminal size={12}/> GÜVENLİ HATLAR</h2>
           <div className="relative">
@@ -122,10 +123,16 @@ export default function DMClient({ currentUser }: { currentUser: any }) {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col bg-[#0a0f1c]/60 border border-white/5 rounded-md relative backdrop-blur-xl">
+      {/* SAĞ TARAF */}
+      <div className={`flex-1 flex-col bg-[#0a0f1c]/60 border border-white/5 rounded-md relative backdrop-blur-xl ${activeUser ? 'flex' : 'hidden md:flex'}`}>
         {activeUser ? (
           <>
             <div className="h-14 border-b border-white/5 flex items-center px-4 gap-3 bg-black/40">
+              {/* Mobil Geri Butonu */}
+              <button onClick={() => setActiveUser(null)} className="md:hidden p-1.5 -ml-2 text-zinc-400 hover:text-white">
+                <ChevronLeft size={20} />
+              </button>
+              
               <img src={activeUser.avatar_url} alt="avatar" className="w-8 h-8 rounded-sm border border-white/10 grayscale-[30%]" />
               <div>
                 <span className="font-bold text-sm text-white uppercase tracking-widest">{activeUser.display_name}</span>
@@ -137,7 +144,7 @@ export default function DMClient({ currentUser }: { currentUser: any }) {
               {messages.map((msg, i) => {
                 const isMe = msg.sender_id === currentUser.id
                 return (
-                  <div key={msg.id || i} className={`flex flex-col max-w-[70%] ${isMe ? "ml-auto items-end" : "mr-auto items-start"}`}>
+                  <div key={msg.id || i} className={`flex flex-col max-w-[85%] sm:max-w-[70%] ${isMe ? "ml-auto items-end" : "mr-auto items-start"}`}>
                     <div className={`px-4 py-2.5 rounded-sm text-[13px] tracking-wide ${isMe ? "bg-red-600/20 border border-red-500/30 text-red-100 rounded-tr-none" : "bg-white/5 border border-white/10 text-zinc-300 rounded-tl-none"}`}>
                       {msg.content}
                     </div>
