@@ -7,6 +7,7 @@ import { useToast } from "./Toast"
 
 export default function UserProfileModal({ userId, onClose }: { userId: string, onClose: () => void }) {
   const [profile, setProfile] = useState<any>(null)
+  const [showcaseItems, setShowcaseItems] = useState<any[]>([])
   
   const [isReporting, setIsReporting] = useState(false)
   const [reportReason, setReportReason] = useState("")
@@ -14,7 +15,17 @@ export default function UserProfileModal({ userId, onClose }: { userId: string, 
   const { showToast } = useToast()
 
   useEffect(() => {
-    supabase.from("profiles").select("*").eq("id", userId).single().then(({ data }) => { if (data) setProfile(data) })
+    supabase.from("profiles").select("*").eq("id", userId).single().then(({ data }) => { 
+      if (data) {
+        setProfile(data)
+        // Vitrin eşyalarını çek
+        if (data.showcase_items && data.showcase_items.length > 0) {
+          supabase.from("inventories").select("*").in("id", data.showcase_items).then(({ data: items }) => {
+            if (items) setShowcaseItems(items)
+          })
+        }
+      } 
+    })
     fetch("/api/me").then(res => res.json()).then(data => { if(data.profile) setCurrentUser(data.profile) })
   }, [userId])
 
@@ -44,13 +55,10 @@ export default function UserProfileModal({ userId, onClose }: { userId: string, 
 
   const handleReport = async () => {
     if (!reportReason.trim()) return showToast("Lütfen bir şikayet sebebi yazın.", "error")
-    
     const res = await fetch("/api/reports", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reported_user_id: userId, reason: reportReason })
     })
-
     if (res.ok) {
       showToast("Kullanıcı başarıyla şikayet edildi.", "success")
       setIsReporting(false)
@@ -65,8 +73,10 @@ export default function UserProfileModal({ userId, onClose }: { userId: string, 
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-sm glass-panel rounded-2xl overflow-hidden relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
         
-        <div className="h-24 bg-gradient-to-r from-red-600 to-red-900 relative">
-          <button onClick={onClose} className="absolute top-3 right-3 p-1.5 bg-black/40 hover:bg-black/80 rounded-full text-white transition"><X size={18} /></button>
+        {/* ARKA PLAN RENGİ / RESMİ */}
+        <div className="h-32 relative" style={profile.background_url ? { backgroundImage: `url(${profile.background_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: 'linear-gradient(to right, #dc2626, #7f1d1d)' }}>
+          <div className="absolute inset-0 bg-black/20" /> {/* Resim varsa karartma */}
+          <button onClick={onClose} className="absolute top-3 right-3 p-1.5 bg-black/40 hover:bg-black/80 rounded-full text-white transition z-10"><X size={18} /></button>
         </div>
         
         <div className="px-6 pb-6 relative">
@@ -84,12 +94,6 @@ export default function UserProfileModal({ userId, onClose }: { userId: string, 
                   {profile.player_role}
                 </span>
               )}
-
-              {profile.is_vac_banned && (
-                <span className="text-[10px] px-2 py-1 rounded border font-bold uppercase tracking-wider text-red-400 bg-red-500/10 border-red-500/20 flex items-center gap-1">
-                  <ShieldAlert size={12}/> VAC BAN
-                </span>
-              )}
             </div>
           </div>
           
@@ -97,8 +101,7 @@ export default function UserProfileModal({ userId, onClose }: { userId: string, 
             <div className="mt-6 bg-red-500/10 border border-red-500/30 p-4 rounded-xl">
               <h3 className="text-sm font-bold text-red-400 mb-2 flex items-center gap-2"><Flag size={16}/> Kullanıcıyı Şikayet Et</h3>
               <textarea 
-                value={reportReason}
-                onChange={(e) => setReportReason(e.target.value)}
+                value={reportReason} onChange={(e) => setReportReason(e.target.value)}
                 placeholder="Neden şikayet ediyorsunuz? (Küfür, hakaret vb.)"
                 className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 min-h-[80px] mb-3"
               />
@@ -109,6 +112,20 @@ export default function UserProfileModal({ userId, onClose }: { userId: string, 
             </div>
           ) : (
             <div className="mt-6 space-y-4">
+              {/* VİTRİN */}
+              {showcaseItems.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Eşya Vitrini</h3>
+                  <div className="flex gap-2 bg-zinc-950/50 p-3 rounded-lg border border-zinc-800/50 justify-center">
+                    {showcaseItems.map(item => (
+                      <div key={item.id} className="w-16 h-16 bg-black/40 border border-white/10 rounded-md p-1 flex items-center justify-center" title={item.skin_name}>
+                        <img src={item.skin_image} className="w-full h-full object-contain" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Hakkında</h3>
                 <p className="text-sm text-zinc-300 bg-zinc-950/50 p-3 rounded-lg border border-zinc-800/50 min-h-[60px]">{profile.about_me || "Henüz bir şey yazmamış."}</p>
@@ -122,22 +139,12 @@ export default function UserProfileModal({ userId, onClose }: { userId: string, 
                 
                 <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800 flex items-center gap-3">
                   <Skull className="text-red-400" size={20} />
-                  <div className="text-left">
-                    <div className="text-[10px] text-zinc-500 uppercase font-bold">K/D</div>
-                    <div className="text-sm font-black text-white">
-                      {profile.kd_ratio !== null && profile.kd_ratio !== undefined ? profile.kd_ratio.toFixed(2) : "Yok"}
-                    </div>
-                  </div>
+                  <div className="text-left"><div className="text-[10px] text-zinc-500 uppercase font-bold">K/D</div><div className="text-sm font-black text-white">{profile.kd_ratio !== null && profile.kd_ratio !== undefined ? profile.kd_ratio.toFixed(2) : "Yok"}</div></div>
                 </div>
 
                 <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800 flex items-center gap-3">
                   <Target className="text-cyan-400" size={20} />
-                  <div className="text-left">
-                    <div className="text-[10px] text-zinc-500 uppercase font-bold">HS %</div>
-                    <div className="text-sm font-black text-white">
-                      {profile.headshot_percentage !== null && profile.headshot_percentage !== undefined ? `%${profile.headshot_percentage.toFixed(1)}` : "Yok"}
-                    </div>
-                  </div>
+                  <div className="text-left"><div className="text-[10px] text-zinc-500 uppercase font-bold">HS %</div><div className="text-sm font-black text-white">{profile.headshot_percentage !== null && profile.headshot_percentage !== undefined ? `%${profile.headshot_percentage.toFixed(1)}` : "Yok"}</div></div>
                 </div>
 
                 <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800 flex items-center gap-3">
