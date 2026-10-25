@@ -1,3 +1,5 @@
+// lib/economy.ts
+
 // Float değerine göre aşınma (Wear) hesaplama
 export function getWear(float: number) {
   if (float < 0.07) return "Factory New";
@@ -7,47 +9,67 @@ export function getWear(float: number) {
   return "Battle-Scarred";
 }
 
-// Float değerine göre fiyat çarpanı (0.00 float = En pahalı, 1.00 float = En ucuz)
+// Float değerine göre fiyat çarpanı
 export function getFloatMultiplier(float: number) {
   return 1.4 - (float * 0.8);
 }
 
-// Nadirliğe göre baz fiyatlar (Steam Ortalamaları - Dolar)
+// CS2 API'sinden gelen nadirlik isimlerine göre baz fiyatlar
 export const RARITY_BASE_PRICES: Record<string, number> = {
-  "Mil-Spec Grade": 1.20,
-  "Restricted": 5.50,
-  "Classified": 25.00,
-  "Covert": 90.00,
-  "Rare Special": 450.00,
+  "Consumer Grade": 0.05,
+  "Industrial Grade": 0.15,
+  "Mil-Spec Grade": 0.80,
+  "Restricted": 3.50,
+  "Classified": 15.00,
+  "Covert": 60.00,
+  "Rare Special": 300.00,
 };
 
-// SKİN İSMİNE GÖRE POPÜLERLİK ÇARPANI
-// Gerçek Steam fiyatlarına daha çok benzemesi için eklenmiştir.
+// SKİN İSMİNE GÖRE POPÜLERLİK VE FİYAT ÇARPANI
 export function getSkinMultiplier(skinName: string) {
   const name = skinName.toLowerCase();
   
-  // Çok popüler ve pahalı skinler (Örn: Dragon Lore, Printstream, Asiimov, Fade)
-  if (name.includes("dragon lore") || name.includes("printstream") || name.includes("fade") || name.includes("doppler") || name.includes("case hardened")) {
-    return 3.5; // 3.5 kat daha pahalı
+  if (name.includes("dragon lore") || name.includes("printstream") || name.includes("fade") || name.includes("doppler") || name.includes("case hardened") || name.includes("gamma doppler")) {
+    return 5.0;
   }
   
-  // Popüler ve orta-pahalı skinler
-  if (name.includes("asiimov") || name.includes("neon rider") || name.includes("kill confirmed") || name.includes("vulcan") || name.includes("hyper beast")) {
-    return 2.0;
+  if (name.includes("asiimov") || name.includes("neon rider") || name.includes("kill confirmed") || name.includes("vulcan") || name.includes("hyper beast") || name.includes("neo-noir") || name.includes("mecha industries")) {
+    return 2.5;
   }
 
-  // Koleksiyonluk / Orta fiyatlı skinler
-  if (name.includes("water elemental") || name.includes("conspiracy") || name.includes("mecha industries") || name.includes("neo-noir")) {
-    return 1.2;
+  if (name.includes("water elemental") || name.includes("conspiracy") || name.includes("cyrex") || name.includes("guardian") || name.includes("atomic alloy")) {
+    return 1.5;
   }
 
-  // Çok sıradan ve ucuz skinler (Sand Dune, Forest DDPAT, Safari Mesh vb.)
-  if (name.includes("sand dune") || name.includes("forest ddpat") || name.includes("safari mesh") || name.includes("boreal forest") || name.includes("predator")) {
-    return 0.2; // Çok ucuz
+  if (name.includes("sand dune") || name.includes("forest ddpat") || name.includes("safari mesh") || name.includes("boreal forest") || name.includes("predator") || name.includes("scorched") || name.includes("contractor")) {
+    return 0.3;
   }
 
-  // Varsayılan çarpan
   return 1.0;
+}
+
+// FİYAT HESAPLAMA (Önce CS2Cap API'sini dener, başarısız olursa tahmini fiyata döner)
+export async function getEstimatedPrice(skin: any) {
+  try {
+    // CS2Cap API'sinden gerçek zamanlı fiyatı çek
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/price?market_hash_name=${encodeURIComponent(skin.name)}`
+    );
+    if (response.ok) {
+      const data = await response.json();
+      if (data.price) {
+        return Number(data.price.toFixed(2));
+      }
+    }
+  } catch (error) {
+    console.error("Failed to fetch price from CS2Cap:", error);
+  }
+
+  // Fallback: Tahmini fiyat hesaplama
+  const rarity = skin.rarity?.name || "Mil-Spec Grade";
+  const basePrice = RARITY_BASE_PRICES[rarity] || 1.00;
+  const multiplier = getSkinMultiplier(skin.name);
+  return Number((basePrice * multiplier).toFixed(2));
 }
 
 // Kasa Fiyatı

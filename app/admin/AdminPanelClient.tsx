@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar"
 import { ShieldBan, ShieldCheck, VolumeX, ShieldAlert, Plus, Save, Coins, X, Flag, Trash, Sparkles, Wand2, Search, Calculator } from "lucide-react"
 import { useToast } from "@/components/Toast"
 import { fetchSkins, Skin } from "@/lib/csgo-api"
-import { RARITY_BASE_PRICES, getSkinMultiplier } from "@/lib/economy"
+import { getEstimatedPrice } from "@/lib/economy"
 
 export default function AdminPanelClient({ users, logs, bannedWords, reports, adminProfile }: any) {
   const [reason, setReason] = useState("")
@@ -50,26 +50,29 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     }
   }
 
-  // Skin Seçildiğinde forma ekle (SADECE ŞANS BELİRLENECEK, FİYAT OTOMATİK)
-  const handleSelectSkin = (skin: Skin) => {
-    // Skinin piyasa değerini hesapla
-    const basePrice = RARITY_BASE_PRICES[skin.rarity.name] || 1.00
-    const multiplier = getSkinMultiplier(skin.name)
-    const estimatedPrice = Number((basePrice * multiplier).toFixed(2))
+  // Skin Seçildiğinde forma ekle (CS2Cap API üzerinden fiyat çeker)
+  const handleSelectSkin = async (skin: Skin) => {
+    setIsSkinPickerOpen(false)
+    setSkinSearch("")
+    
+    // Yükleniyor bildirimi göster
+    showToast("Fiyat hesaplanıyor...", "info")
 
-    setCaseItems([
-      ...caseItems, 
+    // Fiyatı CS2Cap API'sinden çek (veya fallback kullan)
+    const estimatedPrice = await getEstimatedPrice(skin);
+
+    setCaseItems(prev => [
+      ...prev, 
       { 
         skin_id: skin.id,
         skin_name: skin.name, 
         skin_image: skin.image, 
         skin_rarity: skin.rarity.name, 
-        chance: "10", // Varsayılan %10 şans
-        price: estimatedPrice // Fiyat otomatik atanır ve kilitlenir
+        chance: "10", 
+        price: estimatedPrice 
       }
     ])
-    setIsSkinPickerOpen(false)
-    setSkinSearch("")
+    showToast(`${skin.name} eklendi ($${estimatedPrice})`, "success")
   }
 
   // Filtrelenmiş skinler
@@ -78,16 +81,14 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     s.weapon?.name.toLowerCase().includes(skinSearch.toLowerCase())
   )
 
-  // OTOMATİK KASA FİYATI HESAPLAMA (Beklenen Değer + %10 Kâr Marjı)
+  // OTOMATİK KASA FİYATI HESAPLAMA (Beklenen Değer + %15 Kâr Marjı)
   const calculateCasePrice = () => {
     const totalExpectedValue = caseItems.reduce((acc, item) => {
       return acc + (Number(item.price) * (Number(item.chance) / 100))
     }, 0)
     
-    // Eğer hiç eşya yoksa 0 dön
     if (totalExpectedValue === 0) return "0.00"
 
-    // %15 Kâr Marjı ekleyelim ki sistem zarar etmesin (Kasa fiyatı her zaman içindekilerin beklenen değerinden yüksek olmalı)
     const finalPrice = totalExpectedValue * 1.15 
     return finalPrice.toFixed(2)
   }
@@ -489,8 +490,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   {filteredSkins.slice(0, 100).map(skin => {
-                    const basePrice = RARITY_BASE_PRICES[skin.rarity.name] || 1
-                    const estimatedPrice = (basePrice * getSkinMultiplier(skin.name)).toFixed(2)
                     return (
                       <div 
                         key={skin.id} 
@@ -500,7 +499,7 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                         <img src={skin.image} alt={skin.name} className="w-full h-16 object-contain mb-2 group-hover:scale-110 transition-transform" />
                         <div className="text-[10px] font-bold text-white truncate w-full">{skin.name}</div>
                         <div className="text-[9px] text-zinc-500 uppercase mt-0.5">{skin.rarity.name}</div>
-                        <div className="text-[10px] text-green-400 font-black mt-1">~${estimatedPrice}</div>
+                        <div className="text-[10px] text-zinc-600 font-black mt-1">Fiyat Hesaplanacak</div>
                       </div>
                     )
                   })}
