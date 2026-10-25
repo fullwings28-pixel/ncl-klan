@@ -9,7 +9,10 @@ export async function POST(req: Request) {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: "Yetkisiz işlem" }, { status: 401 })
 
-    const { crateId, quantity = 1 } = await req.json()
+    const body = await req.json()
+    const crateId = body.crateId
+    const quantity = Number(body.quantity) || 1 // Sayı olduğundan emin oluyoruz
+
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
 
     const crates = await fetchCrates()
@@ -48,7 +51,7 @@ export async function POST(req: Request) {
       const floatVal = Number((Math.random()).toFixed(8)); 
       const wear = getWear(floatVal);
       
-      // FİYAT HESAPLAMA (Nadirlik Baz Fiyat * Float Çarpanı * Skin Popülerlik Çarpanı)
+      // FİYAT HESAPLAMA
       const basePrice = RARITY_BASE_PRICES[selectedRarity] || 1.00;
       const skinMultiplier = getSkinMultiplier(selectedSkin.name);
       const finalPrice = Number((basePrice * getFloatMultiplier(floatVal) * skinMultiplier).toFixed(2));
@@ -69,7 +72,13 @@ export async function POST(req: Request) {
 
     const newBalance = currentBalance - totalCost
     await supabase.from("profiles").update({ balance: newBalance }).eq("id", session.id)
-    await supabase.from("inventories").insert(inventoryInserts)
+    
+    // VERİTABANI HATASINI YAKALA
+    const { error: insertError } = await supabase.from("inventories").insert(inventoryInserts)
+    if (insertError) {
+      console.error("Envantere ekleme hatası:", insertError)
+      return NextResponse.json({ error: "Eşyalar envantere kaydedilemedi: " + insertError.message }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
@@ -78,6 +87,7 @@ export async function POST(req: Request) {
     })
 
   } catch (error: any) {
+    console.error("Kasa açma hatası:", error)
     return NextResponse.json({ error: "Sunucu hatası: " + error.message }, { status: 500 })
   }
 }

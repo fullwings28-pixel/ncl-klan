@@ -23,8 +23,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
   const [reelKey, setReelKey] = useState(0)
   
   const containerRef = useRef<HTMLDivElement>(null)
-  
-  // KRİTİK EKLENTİ: API'den gelen sonucu animasyon bitene kadar burada tutuyoruz
   const resultRef = useRef<any[] | null>(null) 
   
   const tickAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -87,7 +85,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     const cost = CASE_PRICE * quantity;
     if (!selectedCrate || Number(balance) < cost) return showAlert(`Yetersiz bakiye! ${quantity} kasa için $${cost.toFixed(2)} gerekli.`, "error")
     
-    // Animasyonu ve sesi başlat
     setIsOpening(true); 
     setWonSkins(null); 
     setAnimationTarget(0)
@@ -96,13 +93,13 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     try {
       const res = await fetch("/api/case/open", { 
         method: "POST", headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ crateId: selectedCrate.id, quantity }) 
+        body: JSON.stringify({ crateId: selectedCrate.id, quantity: Number(quantity) }) // Sayı olarak zorluyoruz
       })
       const data = await res.json()
 
       if (!res.ok) { showAlert(data.error || "Kasa açılamadı.", "error"); setIsOpening(false); return }
       
-      // API'den gelen skini ref'e kaydet (henüz modal açma!)
+      // Veriyi hafızaya al
       resultRef.current = data.skins;
 
       const pool = selectedCrate.contains || []
@@ -110,22 +107,12 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       
       const winningIndex = 55
       
-      // Çoklu açmada şeridin farklı yerlerine kazanılan skinleri yerleştir
-      if (data.skins.length > 0) {
-        newReel[winningIndex] = data.skins[0];
-      }
-      if (data.skins.length > 1) {
-        newReel[winningIndex - 10] = data.skins[1];
-      }
-      if (data.skins.length > 2) {
-        newReel[winningIndex - 20] = data.skins[2];
-      }
-      if (data.skins.length > 3) {
-        newReel[winningIndex - 30] = data.skins[3];
-      }
-      if (data.skins.length > 4) {
-        newReel[winningIndex - 40] = data.skins[4];
-      }
+      // EĞER 5'Lİ AÇILDIYSA, 5 SKİNİ DE ŞERİDİN FARKLI YERLERİNE KOY (Görsel şölen)
+      if (data.skins.length > 0) newReel[winningIndex] = data.skins[0];
+      if (data.skins.length > 1) newReel[winningIndex - 5] = data.skins[1];
+      if (data.skins.length > 2) newReel[winningIndex - 10] = data.skins[2];
+      if (data.skins.length > 3) newReel[winningIndex - 15] = data.skins[3];
+      if (data.skins.length > 4) newReel[winningIndex - 20] = data.skins[4];
 
       setReel(newReel); 
       setBalance(data.newBalance)
@@ -150,13 +137,12 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
     }
   }
 
-  // ANİMASYON BİTİNCE TETİKLENİR
   const handleAnimationComplete = () => {
     if (isOpening && animationTarget !== 0) {
       setIsOpening(false)
       if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
       
-      // Animasyon bittikten sonra modalı aç!
+      // Animasyon bitince sonuçları göster
       if (resultRef.current) {
         setWonSkins(resultRef.current);
       }
@@ -249,7 +235,6 @@ export default function CaseClient({ currentUser }: { currentUser: any }) {
       </div>
 
       <AnimatePresence>
-        {/* MODAL SADECE isOpening FALSE İSE VE wonSkins DOLUYSA AÇILIR */}
         {!isOpening && wonSkins && wonSkins.length > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
