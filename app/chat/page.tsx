@@ -10,6 +10,7 @@ import ContextMenu from "@/components/ContextMenu"
 import { Send, ShieldAlert, Hash, Users, Flag, Terminal } from "lucide-react"
 import { useToast } from "@/components/Toast"
 import ConfirmModal from "@/components/ConfirmModal"
+import { usePresence } from "@/hooks/usePresence" // <-- YENİ
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -43,6 +44,9 @@ export default function ChatPage() {
   const router = useRouter()
   const bottomRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
+
+  // ÇEVRİMİÇİ KULLANICILARI ÇEK
+  const onlineUsers = usePresence(currentUser)
 
   const fetchReactions = async () => {
     const { data } = await supabase.from("message_reactions").select("*")
@@ -198,10 +202,10 @@ export default function ChatPage() {
 
       <Navbar profile={currentUser} />
 
-      <div className="flex-1 flex overflow-hidden max-w-[1400px] w-full mx-auto relative z-10 p-4 gap-4">
+      <div className="flex-1 flex overflow-hidden max-w-[1600px] w-full mx-auto relative z-10 p-4 gap-4">
         
         {/* KANALLAR (SOL) */}
-        <div className="w-64 bg-[#0a0f1c]/80 border border-white/5 rounded-md flex flex-col hidden sm:flex backdrop-blur-xl">
+        <div className="w-56 bg-[#0a0f1c]/80 border border-white/5 rounded-md flex flex-col hidden lg:flex backdrop-blur-xl shrink-0">
           <div className="p-4 border-b border-white/5">
             <h2 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-3 flex items-center gap-2"><Terminal size={12}/> KANALLAR</h2>
             <button onClick={() => setShowLFG(true)} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-xs font-bold bg-red-600 hover:bg-red-500 text-white transition-colors uppercase tracking-wider shadow-[0_0_15px_rgba(239,68,68,0.3)]">
@@ -218,8 +222,8 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* SOHBET (SAĞ) */}
-        <div className="flex-1 flex flex-col bg-[#0a0f1c]/60 border border-white/5 rounded-md relative backdrop-blur-xl">
+        {/* SOHBET (ORTA) */}
+        <div className="flex-1 flex flex-col bg-[#0a0f1c]/60 border border-white/5 rounded-md relative backdrop-blur-xl min-w-0">
           <div className="flex-1 overflow-y-auto p-4 sm:px-6 space-y-2 custom-scrollbar">
             {messages.map((msg) => {
               const isMe = msg.user_id === currentUser.id
@@ -268,6 +272,29 @@ export default function ChatPage() {
             )}
           </div>
         </div>
+
+        {/* ÇEVRİMİÇİ KULLANICILAR (SAĞ) */}
+        <div className="w-48 bg-[#0a0f1c]/80 border border-white/5 rounded-md flex flex-col hidden xl:flex backdrop-blur-xl shrink-0">
+          <div className="p-4 border-b border-white/5">
+            <h2 className="text-[10px] font-bold text-green-500 uppercase tracking-[0.2em] flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              ÇEVRİMİÇİ — {onlineUsers.length}
+            </h2>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+            {onlineUsers.map((u: any) => (
+              <div key={u.user_id} onClick={() => setSelectedUserId(u.user_id)} className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors group">
+                <img src={u.avatar_url} alt={u.display_name} className="w-8 h-8 rounded-sm border border-white/10 grayscale-[20%] group-hover:grayscale-0 transition-all" />
+                <div className="flex flex-col min-w-0">
+                  <span className={`text-[12px] font-bold truncate uppercase tracking-wide ${getRoleColor(u.role)}`}>{u.display_name}</span>
+                  <span className="text-[9px] text-zinc-500 font-bold">LVL {u.level}</span>
+                </div>
+              </div>
+            ))}
+            {onlineUsers.length === 0 && <div className="text-[10px] text-zinc-600 text-center mt-4 uppercase tracking-widest">Kimse yok.</div>}
+          </div>
+        </div>
+
       </div>
 
       {selectedUserId && <UserProfileModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />}

@@ -1,14 +1,18 @@
 "use client"
 import Link from "next/link"
-import { Menu, Activity } from "lucide-react"
+import { Menu, Trophy, Activity, Users } from "lucide-react"
 import { useEffect, useState } from "react"
 import NotificationBell from "./NotificationBell"
 import Sidebar from "./Sidebar"
 import GlobalNotifications from "./GlobalNotifications"
+import { usePresence } from "@/hooks/usePresence"
 
 export default function Navbar({ profile }: { profile: any }) {
   const [siteName, setSiteName] = useState("NCL Klan Merkezi")
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  
+  // ÇEVRİMİÇİ KULLANICI SAYISI
+  const onlineUsers = usePresence(profile)
 
   useEffect(() => {
     fetch("/api/settings").then(res => res.json()).then(data => setSiteName(data.site_name))
@@ -38,18 +42,29 @@ export default function Navbar({ profile }: { profile: any }) {
             </Link>
           </div>
 
-          <div className="hidden md:flex items-center gap-6 px-4 py-1.5 bg-black/40 border border-white/5 rounded-full">
+          <div className="hidden md:flex items-center gap-4 px-4 py-1.5 bg-black/40 border border-white/5 rounded-full">
             <div className="flex items-center gap-2 text-xs font-bold text-zinc-400">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div> SUNUCU AKTİF
             </div>
             <div className="w-px h-3 bg-white/10"></div>
-            <div className="flex items-center gap-2 text-xs font-bold text-zinc-400">
-              <Activity size={12} className="text-red-500" /> {profile?.display_name}
+            
+            {/* ÇEVRİMİÇİ KULLANICILAR */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-green-400">{onlineUsers.length} Çevrimiçi</span>
+              <div className="flex -space-x-2">
+                {onlineUsers.slice(0, 3).map((u, i) => (
+                  <img key={i} src={u.avatar_url} alt={u.display_name} title={u.display_name} className="w-6 h-6 rounded-full border border-[#050811] object-cover z-10" />
+                ))}
+                {onlineUsers.length > 3 && (
+                  <div className="w-6 h-6 rounded-full bg-zinc-800 border border-[#050811] flex items-center justify-center text-[9px] font-bold text-zinc-400 z-0">
+                    +{onlineUsers.length - 3}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* BAKİYE DOLAR OLARAK GÖSTERİLDİ */}
             <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-md">
               <span className="text-green-500 font-bold text-sm">$</span>
               <span className="text-sm font-bold text-green-500">{Number(profile?.balance || 0).toFixed(2)}</span>
