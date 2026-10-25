@@ -25,7 +25,6 @@ export function usePresence(currentUser: any) {
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          // Kanala başarıyla abone olunduktan sonra kendi bilgilerimizi yayınla
           await channel.track({
             user_id: currentUser.id,
             display_name: currentUser.display_name,
