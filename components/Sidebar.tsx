@@ -48,6 +48,7 @@ export default function Sidebar({ isOpen, onClose, profile }: SidebarProps) {
         { name: "Günlük Görevler", href: "/quests", icon: Target, color: "text-purple-400" },
         { name: "Takvim", href: "/events", icon: Calendar, color: "text-zinc-400" },
         { name: "Üyeler", href: "/members", icon: Users, color: "text-zinc-400" },
+        { name: "Forum", href: "/forum", icon: MessageSquare, color: "text-cyan-500" },
       ]
     }
   ]
