@@ -40,15 +40,12 @@ export async function GET(req: Request) {
   const player = steamData.response.players[0]
 
   // 4) Supabase Bağlantısı
-  // Hata ayıklama için URL'i terminale yazdırıyoruz
-  console.log("🔍 Kullanılan Supabase URL:", process.env.SUPABASE_URL)
-
   const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_KEY!
   )
 
-  // 5) Veritabanına Kaydet
+  // 5) Profili Kaydet/Güncelle
   const { data: profile, error } = await supabase
     .from("profiles")
     .upsert(
@@ -64,11 +61,21 @@ export async function GET(req: Request) {
     .single()
 
   if (error || !profile) {
-    console.error("❌ Supabase Kayıt Hatası Detayı:", error) 
     return NextResponse.json({ error: "Kayıt başarısız" }, { status: 500 })
   }
 
-  // 6) JWT Oturum Cookie'si Oluştur
+  // --- YENİ EKLENEN KISIM: GİRİŞ LOGU ---
+  const ipAddress = req.headers.get("x-forwarded-for") || "Bilinmiyor"
+  const userAgent = req.headers.get("user-agent") || "Bilinmiyor"
+  
+  await supabase.from("login_logs").insert({
+    user_id: profile.id,
+    ip_address: ipAddress,
+    user_agent: userAgent
+  })
+  // ---------------------------------------
+
+  // 6) JWT Oturum Cookie'si
   const secret = new TextEncoder().encode(process.env.SESSION_SECRET!)
   const token = await new SignJWT({ sub: profile.id, steamId })
     .setProtectedHeader({ alg: "HS256" })

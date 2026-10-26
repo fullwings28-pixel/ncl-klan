@@ -1,28 +1,24 @@
 "use client"
 import { useState, useEffect } from "react"
 import Navbar from "@/components/Navbar"
-import { ShieldBan, ShieldCheck, VolumeX, ShieldAlert, Plus, Save, Megaphone, Coins, X, Flag, Trash, Sparkles, Wand2, Search, Calculator, Pencil } from "lucide-react"
+import { ShieldBan, ShieldCheck, VolumeX, ShieldAlert, Plus, Save, Megaphone, Coins, X, Flag, Trash, Sparkles, Wand2, Search, Calculator, Pencil, Monitor } from "lucide-react"
 import { useToast } from "@/components/Toast"
 import { fetchSkins, Skin } from "@/lib/csgo-api"
 import { getEstimatedPrice } from "@/lib/economy"
 
-export default function AdminPanelClient({ users, logs, bannedWords, reports, adminProfile }: any) {
+export default function AdminPanelClient({ users, logs, bannedWords, reports, adminProfile, loginLogs }: any) {
   const [reason, setReason] = useState("")
   
-  // Ayarlar, Odalar State'leri
   const [siteName, setSiteName] = useState("")
   const [newRoomName, setNewRoomName] = useState("")
   const [rooms, setRooms] = useState<any[]>([])
   
-  // DUYURU STATE'LERİ
   const [announcement, setAnnouncement] = useState("")
   const [allAnnouncements, setAllAnnouncements] = useState<any[]>([])
   const [editAnnModal, setEditAnnModal] = useState({ isOpen: false, id: 0, content: "" })
   
-  // Kredi Verme Modalı
   const [creditModal, setCreditModal] = useState({ isOpen: false, userId: "", userName: "", amount: "" })
 
-  // KASA OLUŞTURMA STATE'LERİ
   const [showCaseModal, setShowCaseModal] = useState(false)
   const [caseName, setCaseName] = useState("")
   const [casePrompt, setCasePrompt] = useState("")
@@ -30,7 +26,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
   const [caseItems, setCaseItems] = useState<any[]>([])
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
 
-  // SKİN SEÇİCİ STATE'LERİ
   const [isSkinPickerOpen, setIsSkinPickerOpen] = useState(false)
   const [allSkins, setAllSkins] = useState<Skin[]>([])
   const [skinSearch, setSkinSearch] = useState("")
@@ -50,7 +45,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     fetchAnnouncements()
   }, [])
 
-  // DUYURU İŞLEMLERİ
   const handleSendAnnouncement = async () => {
     if(!announcement.trim()) return
     await fetch("/api/announcements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: announcement }) })
@@ -77,7 +71,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     fetchAnnouncements()
   }
 
-  // SKİN PICKER
   const openSkinPicker = async () => {
     setIsSkinPickerOpen(true)
     if (allSkins.length === 0) {
@@ -97,7 +90,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
     showToast(`${skin.name} eklendi ($${estimatedPrice})`, "success")
   }
 
-  // DİĞER FONKSİYONLAR (Kullanıcı, Kasa vb.)
   const handleAction = async (userId: string, action: string) => {
     const res = await fetch("/api/admin/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ targetUserId: userId, action, reason }) })
     if (res.ok) { showToast(`İşlem başarılı: ${action}`, "success"); setTimeout(() => window.location.reload(), 1000) } 
@@ -240,7 +232,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
           </div>
         </div>
 
-        {/* DUYURU GEÇMİŞİ LİSTESİ */}
         <div className="hud-panel p-5 rounded-md border border-white/5">
           <h2 className="text-[10px] font-bold mb-3 text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
             <Megaphone size={14}/> GEÇMİŞ DUYURULAR
@@ -262,7 +253,27 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
           </div>
         </div>
 
-        {/* KASA YÖNETİMİ BUTONU */}
+        <div className="hud-panel border border-white/5 rounded-md p-5">
+          <h2 className="text-[10px] font-bold mb-3 text-cyan-400 uppercase tracking-[0.2em] flex items-center gap-2">
+            <Monitor size={14}/> SON GİRİŞ KAYITLARI
+          </h2>
+          <ul className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+            {loginLogs?.map((log: any) => (
+              <li key={log.id} className="text-[11px] bg-black/40 p-2.5 rounded-sm border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-mono text-zinc-400">
+                <div>
+                  <span className="text-white font-bold">{log.profiles?.display_name || 'Bilinmeyen'}</span>
+                  <span className="mx-2">→</span>
+                  IP: {log.ip_address}
+                  <span className="mx-2 hidden sm:inline">|</span>
+                  <span className="text-[9px] text-zinc-600 hidden sm:inline max-w-[200px] truncate">{log.user_agent}</span>
+                </div>
+                <span className="text-[9px] text-zinc-600 bg-white/5 px-2 py-0.5 rounded-sm">{new Date(log.created_at).toLocaleString('tr-TR')}</span>
+              </li>
+            ))}
+            {loginLogs?.length === 0 && <li className="text-center text-xs text-zinc-500 py-2">Kayıt yok.</li>}
+          </ul>
+        </div>
+
         <div className="hud-panel p-5 rounded-md flex justify-between items-center border border-purple-500/30">
           <div>
             <h2 className="text-lg font-black text-white uppercase tracking-widest flex items-center gap-2"><Sparkles className="text-purple-500" size={20}/> Özel Kasa Yönetimi</h2>
@@ -271,7 +282,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
           <button onClick={() => setShowCaseModal(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-sm text-xs font-black uppercase tracking-widest transition flex items-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.3)]"><Plus size={16}/> Yeni Kasa Oluştur</button>
         </div>
 
-        {/* KULLANICI LİSTESİ */}
         <div>
           <input type="text" placeholder="İŞLEM SEBEBİ (BAN/MUTE İÇİN)" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full bg-[#0a0f1c] rounded-sm border border-white/5 px-5 py-3 mb-4 text-xs font-bold focus:outline-none focus:border-red-500/50 text-white placeholder-zinc-600 tracking-widest" />
           <div className="hud-panel rounded-md overflow-hidden border border-white/5">
@@ -326,10 +336,9 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
           </div>
         </div>
 
-        {/* LOGLAR */}
         <div className="hud-panel border border-white/5 rounded-md p-5">
           <h2 className="text-[10px] font-bold mb-3 text-zinc-400 uppercase tracking-[0.2em]">SİSTEM LOGLARI</h2>
-          <ul className="space-y-2">
+          <ul className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
             {logs.map((log: any) => (
               <li key={log.id} className="text-[11px] bg-black/40 p-2.5 rounded-sm border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-mono">
                 <div>
@@ -345,7 +354,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
         </div>
       </div>
 
-      {/* DUYURU DÜZENLEME MODALI */}
       {editAnnModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setEditAnnModal({ ...editAnnModal, isOpen: false })}>
           <div className="hud-panel p-6 rounded-md max-w-md w-full border border-blue-500/30 shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
@@ -364,7 +372,6 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
         </div>
       )}
 
-      {/* KREDİ VERME MODALI */}
       {creditModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setCreditModal({ ...creditModal, isOpen: false })}>
           <div className="hud-panel p-6 rounded-md max-w-sm w-full border border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.15)] relative" onClick={(e) => e.stopPropagation()}>
@@ -384,22 +391,17 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
         </div>
       )}
 
-      {/* KASA OLUŞTURMA MODALI */}
       {showCaseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto custom-scrollbar">
           <div className="bg-[#0a0f1c] border border-white/10 p-6 rounded-md max-w-5xl w-full my-8 relative shadow-2xl">
             <button onClick={() => setShowCaseModal(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={24}/></button>
-            
             <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2"><Wand2 className="text-purple-500" size={28}/> Yapay Zeka Kasa Oluşturucu</h2>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-              
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest block mb-1">Kasa İsmi</label>
                   <input type="text" value={caseName} onChange={e => setCaseName(e.target.value)} className="w-full bg-black/50 border border-white/10 rounded-sm px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500 font-bold" placeholder="Örn: NCL Seçkin Kasa" />
                 </div>
-                
                 <div className="border-t border-white/10 pt-4">
                   <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest block mb-2">Yapay Zeka Resim Komutu</label>
                   <div className="flex gap-2">
@@ -407,14 +409,12 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                     <button onClick={generateCaseImage} disabled={isGeneratingImage} className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-3 rounded-sm text-xs font-bold transition flex items-center gap-2 disabled:opacity-50 uppercase tracking-widest">{isGeneratingImage ? "Üretiliyor..." : "RESİM ÜRET"}</button>
                   </div>
                 </div>
-
                 {caseImageUrl && (
                   <div className="mt-4 p-4 bg-black/40 border border-white/10 rounded-sm flex flex-col items-center">
                     <img src={caseImageUrl} alt="Kasa" className="w-48 h-48 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]" />
                     <span className="text-[10px] text-green-500 font-bold mt-2 uppercase tracking-widest">Resim Hazır</span>
                   </div>
                 )}
-
                 <div className="mt-4 bg-purple-500/10 border border-purple-500/30 rounded-sm p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Calculator className="text-purple-400" size={28} />
@@ -425,15 +425,12 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                   </div>
                   <div className="text-3xl font-black text-white">${calculateCasePrice()}</div>
                 </div>
-
               </div>
-              
               <div className="bg-black/30 border border-white/5 p-5 rounded-md flex flex-col h-[500px]">
                 <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2 shrink-0">
                   <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest">Kasa İçeriği</h3>
                   <div className={`text-xs font-bold ${caseItems.reduce((sum, item) => sum + Number(item.chance), 0) > 100 ? "text-red-500" : "text-green-500"}`}>Toplam Şans: %{caseItems.reduce((sum, item) => sum + Number(item.chance), 0)}</div>
                 </div>
-
                 <div className="space-y-2 overflow-y-auto custom-scrollbar pr-2 flex-1">
                   {caseItems.map((item, idx) => (
                     <div key={idx} className="flex gap-2 items-center bg-black/40 p-2 border border-white/5 rounded-sm">
@@ -442,33 +439,27 @@ export default function AdminPanelClient({ users, logs, bannedWords, reports, ad
                         <div className="text-[10px] font-bold text-white truncate">{item.skin_name}</div>
                         <div className="text-[8px] text-zinc-500 uppercase">{item.skin_rarity}</div>
                       </div>
-                      
                       <div className="flex flex-col items-center">
                         <label className="text-[8px] text-zinc-500 font-bold uppercase mb-0.5">Değer $</label>
                         <div className="w-16 text-center text-xs text-green-400 font-black py-1">${Number(item.price).toFixed(2)}</div>
                       </div>
-
                       <div className="flex flex-col items-center">
                         <label className="text-[8px] text-purple-400 font-bold uppercase mb-0.5">Şans %</label>
                         <input type="number" value={item.chance} onChange={(e) => { const newItems = [...caseItems]; newItems[idx].chance = e.target.value; setCaseItems(newItems); }} className="w-16 bg-[#050811] border border-purple-500/30 rounded-sm px-2 py-1 text-center text-xs text-white focus:border-purple-500" />
                       </div>
-                      
                       <button onClick={() => setCaseItems(caseItems.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-500/10 p-1.5 rounded-sm transition self-end mb-0.5"><Trash size={14}/></button>
                     </div>
                   ))}
                   {caseItems.length === 0 && <div className="text-center py-6 text-zinc-600 text-xs uppercase tracking-widest">Henüz eşya eklenmedi.</div>}
                 </div>
-                
                 <button onClick={openSkinPicker} className="w-full mt-4 bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 text-purple-400 hover:text-white text-xs font-bold py-3 rounded-sm transition uppercase tracking-widest flex items-center justify-center gap-2 shrink-0"><Search size={14}/> Skin Seç ve Ekle</button>
               </div>
             </div>
-
             <button onClick={handleSaveCase} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-sm text-sm uppercase tracking-widest transition shadow-[0_0_20px_rgba(168,85,247,0.3)]">Kasayı Sisteme Kaydet</button>
           </div>
         </div>
       )}
 
-      {/* SKİN SEÇİCİ MODALI */}
       {isSkinPickerOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
           <div className="bg-[#0a0f1c] border border-white/10 p-6 rounded-md max-w-4xl w-full relative shadow-2xl flex flex-col h-[80vh]">
