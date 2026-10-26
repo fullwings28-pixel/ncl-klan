@@ -4,7 +4,11 @@ import { sendPushNotification } from "@/lib/push"
 
 export async function POST(req: Request) {
   try {
-    const { userId, roomId, content } = await req.json()
+    const body = await req.json()
+    const { userId, roomId, content } = body
+
+    if (!userId || !roomId || !content) return NextResponse.json({ error: "Eksik parametre" }, { status: 400 })
+
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
 
     // 1. KÜFÜR FİLTRESİ
@@ -38,29 +42,32 @@ export async function POST(req: Request) {
     if (mentionMatch) {
       const uniqueMentions = [...new Set(mentionMatch)]
       for (const match of uniqueMentions) {
-        const username = (match as string).substring(1)
+        const username = (match as string).substring(1) 
+        
         if (username.toLowerCase() === 'everyone' || username.toLowerCase() === 'herkes') {
           const { data: allUsers } = await supabase.from("profiles").select("id").neq("id", userId)
           if (allUsers) {
+            // Veritabanı bildirimi
             await supabase.from("notifications").insert(allUsers.map(u => ({
               user_id: u.id, sender_id: userId, type: 'mention', message: `Sohbette @everyone etiketlendi!`, link: `/chat`
             })))
             
-            // Herkese Push Bildirimi Gönder
+            // Push bildirimleri (Toplu)
             for (const u of allUsers) {
-              await sendPushNotification(u.id, "Sohbet Etiketlemesi", `${profile?.display_name} herkesi etiketledi!`, "/chat")
+              sendPushNotification(u.id, "Yeni Etiketleme", `${profile?.display_name || 'Birisi'} herkesi etiketledi: ${filteredContent.substring(0, 30)}`, "/chat")
             }
           }
         } else {
           const { data: mentionedUsers } = await supabase.from("profiles").select("id").ilike("display_name", `%${username}%`)
           if (mentionedUsers) {
             for (const mUser of mentionedUsers) {
+              // Veritabanı bildirimi
               await supabase.from("notifications").insert({
                 user_id: mUser.id, sender_id: userId, type: 'mention', message: `Sohbette senden bahsedildi!`, link: `/chat`
               })
               
-              // Etiketlenen Kişiye Push Bildirimi Gönder
-              await sendPushNotification(mUser.id, "Sohbet Etiketlemesi", `${profile?.display_name} senden bahsetti!`, "/chat")
+              // Push bildirimi
+              sendPushNotification(mUser.id, "Yeni Etiketleme", `${profile?.display_name || 'Birisi'} senden bahsetti: ${filteredContent.substring(0, 30)}`, "/chat")
             }
           }
         }

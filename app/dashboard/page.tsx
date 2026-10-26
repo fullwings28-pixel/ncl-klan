@@ -4,7 +4,7 @@ import UpdateRankButton from "./UpdateRankButton"
 import EditAbout from "./EditAbout"
 import SelectRole from "./SelectRole"
 import CustomizeProfile from "./CustomizeProfile"
-import PushNotificationButton from "./PushNotificationButton" // YENİ
+import PushNotificationButton from "./PushNotificationButton"
 import Navbar from "@/components/Navbar"
 import { Activity, Shield, Trophy, Clock, Target, Skull, ShieldAlert, Package, MessageSquare, DollarSign } from "lucide-react"
 
@@ -22,6 +22,7 @@ export default async function Dashboard() {
       <div className="max-w-5xl mx-auto px-6 mt-8 relative z-10">
         <div className="hud-panel rounded-xl p-8 flex flex-col md:flex-row items-center md:items-start gap-8 relative overflow-hidden">
           
+          {/* KİŞİSELLEŞTİRİLMİŞ ARKA PLAN */}
           {profile.background_url && (
             <div className="absolute inset-0 z-0 opacity-30">
               <img src={profile.background_url} alt="bg" className="w-full h-full object-cover" />
@@ -47,9 +48,9 @@ export default async function Dashboard() {
                   <div className="text-xs text-red-500 font-bold tracking-wider flex items-center gap-1"><Activity size={14}/> AKTİF</div>
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col items-end gap-2">
                 <UpdateRankButton steamId={profile.steam_id} />
-                <PushNotificationButton /> {/* YENİ EKLENDİ */}
+                <PushNotificationButton />
               </div>
             </div>
             
